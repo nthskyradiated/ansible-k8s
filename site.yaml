@@ -1,0 +1,6 @@
+---
+- hosts: all
+  name: Provision Kubernetes
+  become: true
+  roles:
+    - kubernetes

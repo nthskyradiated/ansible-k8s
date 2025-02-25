@@ -1,0 +1,49 @@
+---
+- name: Add Kubernetes GPG key
+  ansible.builtin.apt_key:
+    url: https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key
+    state: present
+  become: true
+
+- name: Add Kubernetes repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /"
+    state: present
+  become: true
+
+- name: Install Kubernetes components
+  ansible.builtin.apt:
+    name: 
+      - kubelet
+      - kubeadm
+      - kubectl
+    state: present
+  become: true
+
+- name: Hold Kubernetes packages
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  with_items:
+    - kubelet
+    - kubeadm
+    - kubectl
+  become: true
+
+- name: Enable kubelet
+  ansible.builtin.systemd:
+    name: kubelet
+    enabled: yes
+    state: started
+  become: true
+
+- name: Initialize Kubernetes cluster
+  ansible.builtin.shell: |
+    kubeadm init --pod-network-cidr={{ pod_cidr }} \
+    --service-cidr={{ service_cidr }} \
+    --control-plane-endpoint={{ control_plane_endpoint }} \
+    --skip-phases=addon/kube-proxy \
+    --upload-certs
+  when: inventory_hostname == 'controlplane01'
+  register: kubeadm_init
+  become: true

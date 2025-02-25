@@ -1,0 +1,188 @@
+# -*- mode: ruby -*-
+# vi:set ft=ruby sw=2 ts=2 sts=2:
+
+RAM_SIZE = 16
+CPU_CORES = 8
+IP_NW = "192.168.1."
+
+ram_selector = (RAM_SIZE / 4) * 4
+if ram_selector < 8
+  raise "Insufficient memory #{RAM_SIZE}GB. min 8GB"
+end
+MAX_MEMORY_MB = 4096
+RESOURCES = {
+  "control" => {
+    1 => {
+      # "ram" => [ram_selector * 128, MAX_MEMORY_MB].min(),
+      "cpu" => CPU_CORES >= 12 ? 4 : 2,
+    },
+    2 => {
+      "ram" => [ram_selector * 128, MAX_MEMORY_MB].min(),
+      "cpu" => CPU_CORES > 8 ? 2 : 1,
+    },
+  },
+  "worker" => {
+    # "ram" => [ram_selector * 128, MAX_MEMORY_MB].max(),
+    "cpu" => 2,
+  },
+}
+
+def setup_dns(node)
+  node.vm.provision "setup-hosts", type: "shell", path: "ubuntu/vagrant/setup-hosts.sh" do |s|
+    s.args = ["eth0", node.vm.hostname, "#{IP_NW}"]
+  end
+  node.vm.provision "setup-dns", type: "shell", path: "ubuntu/update-dns.sh"
+end
+
+def setup_ssh(node)
+  node.vm.provision "setup-ssh", type: "shell", inline: <<-SHELL
+    # Enable password authentication
+    sed -i --regexp-extended 's/#?PasswordAuthentication (yes|no)/PasswordAuthentication yes/' /etc/ssh/sshd_config
+    sed -i --regexp-extended 's/#?Include \\/etc\\/ssh\\/sshd_config.d\\/\\*.conf/#Include \\/etc\\/ssh\\/sshd_config.d\\/\\*.conf/' /etc/ssh/sshd_config
+    sed -i 's/KbdInteractiveAuthentication no/KbdInteractiveAuthentication yes/' /etc/ssh/sshd_config
+    systemctl reload ssh
+
+    # Setup .ssh directory
+    if [ ! -d /home/vagrant/.ssh ]; then
+        mkdir /home/vagrant/.ssh
+        chmod 700 /home/vagrant/.ssh
+        chown vagrant:vagrant /home/vagrant/.ssh
+    fi
+  SHELL
+end
+
+def provision_kubernetes_node(node)
+  node.vm.provision "setup-kernel", type: "shell", path: "ubuntu/setup-kernel.sh"
+  setup_ssh(node)
+  install_sshpass(node)
+  node.vm.provision "file", source: "ubuntu/net-cleanup.sh", destination: "/home/vagrant/net-cleanup.sh"
+  node.vm.provision "file", source: "ubuntu/kubeadm-init.sh", destination: "/home/vagrant/kubeadm-init.sh"
+end
+
+def install_sshpass(node)
+  node.vm.provision "install-sshpass", type: "shell", inline: <<-SHELL
+    sudo apt-get update -y
+    sudo apt-get install -y sshpass
+  SHELL
+end
+
+NUM_CONTROL_NODES = 1
+NUM_WORKER_NODE = 2
+MASTER_IP_START = 210
+NODE_IP_START = 220
+LB_IP_START = 200
+
+Vagrant.configure("2") do |config|
+  # Trigger to clean known_hosts after destroying VMs
+  config.trigger.after :destroy do |trigger|
+    trigger.run = {
+      inline: "bash ./ssh-cleanup.sh"
+    }
+  end
+
+  # Trigger to clean known_hosts after starting (up or reload) VMs
+  config.trigger.after :up do |trigger|
+    trigger.run = {
+      inline: "bash ./ssh-cleanup.sh"
+    }
+  end
+end
+
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "sture/ubuntu2404"
+  config.vm.box_version = "2024.12.04.10"
+  config.vm.boot_timeout = 900
+
+  config.vm.box_check_update = false
+
+  (1..NUM_CONTROL_NODES).each do |i|
+    config.vm.define "controlplane0#{i}" do |node|
+      node.vm.provider "hyperv" do |hv|
+        hv.vmname = "kubernetes-ha-controlplane-#{i}"
+        # hv.memory = RESOURCES["control"][i > 2 ? 2 : i]["ram"]
+        hv.memory = 3072
+        hv.maxmemory = 3584
+        hv.cpus = RESOURCES["control"][i > 2 ? 2 : i]["cpu"]
+        hv.enable_virtualization_extensions = true
+        hv.ip_address_timeout = 300
+      end
+      node.vm.hostname = "controlplane0#{i}"
+      install_sshpass(node)
+      provision_kubernetes_node(node)
+      if i == 1
+        node.vm.provision "file", source: "./ubuntu/tmux.conf", destination: "$HOME/.tmux.conf"
+        node.vm.provision "file", source: "./ubuntu/vimrc", destination: "$HOME/.vimrc"
+        node.vm.provision "file", source: "./ubuntu/post-setup.sh", destination: "$HOME/post-setup.sh"
+        node.vm.provision "file", source: "./ubuntu/cilium-values.yaml", destination: "$HOME/cilium-values.yaml"
+        node.vm.provision "file", source: "../tools/approve-csr.sh", destination: "$HOME/approve-csr.sh"
+    end
+    node.vm.provision "setup-network", type: "shell", path: "./ubuntu/vagrant/setup-network.sh" do |s|
+
+      s.args = ["eth0", "#{IP_NW}#{MASTER_IP_START + i}", "#{IP_NW}1"]
+    end
+    setup_dns node
+    end
+  end
+
+  if NUM_CONTROL_NODES >= 2
+    config.vm.define "loadbalancer" do |node|
+      node.vm.provider "hyperv" do |hv|
+        hv.vmname = "kubernetes-ha-lb"
+        hv.memory = 1024
+        hv.cpus = 1
+      end
+      node.vm.hostname = "loadbalancer"
+      node.vm.network :private_network, ip: "#{IP_NW}#{LB_IP_START}"
+      node.vm.network "forwarded_port", guest: 22, host: 2730
+      install_sshpass(node)
+      setup_ssh(node)
+      setup_dns node
+      node.vm.provision "setup-network", type: "shell", path: "./ubuntu/vagrant/setup-network.sh" do |s|
+        s.args = ["eth0", "#{IP_NW}#{LB_IP_START}", "#{IP_NW}1"]
+      end
+    end
+  end
+
+(1..NUM_WORKER_NODE).each do |i| 
+    config.vm.define "node0#{i}" do |node|
+      node.vm.provider "hyperv" do |hv|
+        hv.vmname = "kubernetes-ha-node-#{i}"
+        # hv.memory = RESOURCES["worker"]["ram"]
+        hv.memory = 4096
+        hv.maxmemory = 5120
+        hv.cpus = RESOURCES["worker"]["cpu"]
+        hv.ip_address_timeout = 300
+      end
+      node.vm.hostname = "node0#{i}"
+      install_sshpass(node)
+      provision_kubernetes_node(node)
+      node.vm.provision "file", source: "ubuntu/worker-post.sh", destination: "/home/vagrant/worker-post.sh"
+      node.vm.provision "setup-network", type: "shell", path: "./ubuntu/vagrant/setup-network.sh" do |s|
+        s.args = ["eth0", "#{IP_NW}#{NODE_IP_START + i}", "#{IP_NW}1"]
+      end
+      setup_dns node
+      end
+    end
+
+  # Ansible provisioning
+  if Vagrant::Util::Platform.windows?
+    config.vm.provision "ansible_local" do |ansible|
+      ansible.playbook = "../site.yaml"
+      ansible.inventory_path = "../inventory"
+      ansible.limit = "all"
+      ansible.become = true
+      ansible.compatibility_mode = "2.0"
+      ansible.install = true
+      ansible.install_mode = "pip"
+    end
+  else
+    config.vm.provision "ansible" do |ansible|
+      ansible.playbook = "../site.yaml"
+      ansible.inventory_path = "../inventory"
+      ansible.limit = "all"
+      ansible.become = true
+      ansible.compatibility_mode = "2.0"
+    end
+  end
+end

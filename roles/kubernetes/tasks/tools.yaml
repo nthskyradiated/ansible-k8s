@@ -1,0 +1,45 @@
+---
+- name: Install additional tools on controlplane01
+  when: inventory_hostname == 'controlplane01'
+  block:
+    - name: Download and install Cilium CLI
+      ansible.builtin.shell: |
+        CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
+        CLI_ARCH=amd64
+        if [ "$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi
+        curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
+        sha256sum --check cilium-linux-${CLI_ARCH}.tar.gz.sha256sum
+        sudo tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
+        rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
+
+    - name: Download and install Hubble
+      ansible.builtin.shell: |
+        HUBBLE_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/hubble/master/stable.txt)
+        HUBBLE_ARCH=amd64
+        if [ "$(uname -m)" = "aarch64" ]; then HUBBLE_ARCH=arm64; fi
+        curl -L --fail --remote-name-all https://github.com/cilium/hubble/releases/download/$HUBBLE_VERSION/hubble-linux-${HUBBLE_ARCH}.tar.gz{,.sha256sum}
+        sha256sum --check hubble-linux-${HUBBLE_ARCH}.tar.gz.sha256sum
+        sudo tar xzvfC hubble-linux-${HUBBLE_ARCH}.tar.gz /usr/local/bin
+        rm hubble-linux-${HUBBLE_ARCH}.tar.gz{,.sha256sum}
+
+    - name: Add Helm repository key
+      ansible.builtin.shell: |
+        curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+
+    - name: Add HashiCorp repository key
+      ansible.builtin.shell: |
+        wget -q -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+    - name: Add Helm and HashiCorp repositories
+      ansible.builtin.shell: |
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list > /dev/null
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list > /dev/null
+
+    - name: Install additional packages
+      ansible.builtin.apt:
+        name:
+          - terraform
+          - helm
+          - jq
+        state: present
+        update_cache: true

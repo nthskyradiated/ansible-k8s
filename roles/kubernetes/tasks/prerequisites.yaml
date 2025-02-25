@@ -1,0 +1,46 @@
+---
+- name: Update and upgrade system packages
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: true
+  become: true
+
+- name: Disable swap
+  ansible.builtin.shell: |
+    swapoff -a
+    sed -i '/ swap / s/^/#/' /etc/fstab
+    rm -f /swapfile
+  become: true
+
+- name: Configure kernel modules
+  ansible.builtin.template:
+    src: k8s.conf.j2
+    dest: /etc/modules-load.d/k8s.conf
+  become: true
+
+- name: Load kernel modules
+  ansible.builtin.shell: |
+    modprobe overlay
+    modprobe br_netfilter
+  become: true
+
+- name: Configure sysctl parameters
+  ansible.builtin.template:
+    src: kubernetes.conf.j2
+    dest: /etc/sysctl.d/kubernetes.conf
+  become: true
+
+- name: Apply sysctl parameters
+  ansible.builtin.shell: sysctl --system
+  become: true
+
+- name: Install required packages
+  ansible.builtin.apt:
+    name: 
+      - curl
+      - gnupg2
+      - software-properties-common
+      - apt-transport-https
+      - ca-certificates
+    state: present
+  become: true
