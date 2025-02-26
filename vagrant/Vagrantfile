@@ -86,14 +86,10 @@ Vagrant.configure("2") do |config|
       inline: "bash ./ssh-cleanup.sh"
     }
   end
-end
 
-
-Vagrant.configure("2") do |config|
   config.vm.box = "sture/ubuntu2404"
   config.vm.box_version = "2024.12.04.10"
   config.vm.boot_timeout = 900
-
   config.vm.box_check_update = false
 
   (1..NUM_CONTROL_NODES).each do |i|
@@ -121,7 +117,7 @@ Vagrant.configure("2") do |config|
         node.vm.provision "file", source: "./ubuntu/post-setup.sh", destination: "$HOME/post-setup.sh"
         node.vm.provision "file", source: "./ubuntu/cilium-values.yaml", destination: "$HOME/cilium-values.yaml"
         node.vm.provision "file", source: "../tools/approve-csr.sh", destination: "$HOME/approve-csr.sh"
-    end
+      end
     end
   end
 
@@ -144,13 +140,13 @@ Vagrant.configure("2") do |config|
     end
   end
 
-(1..NUM_WORKER_NODE).each do |i| 
-    config.vm.define "node0#{i}" do |node|
+  (1..NUM_WORKER_NODE).each do |i|
+    config.vm.define "node0#{i}", primary: true do |node|
       node.vm.provider "hyperv" do |hv|
         hv.vmname = "kubernetes-ha-node-#{i}"
         # hv.memory = RESOURCES["worker"]["ram"]
-        hv.memory = 4096
-        hv.maxmemory = 5120
+        hv.memory = 3584
+        hv.maxmemory = 4096
         hv.cpus = RESOURCES["worker"]["cpu"]
         hv.ip_address_timeout = 300
       end
@@ -166,33 +162,16 @@ Vagrant.configure("2") do |config|
     end
   end
 
-  # Ansible provisioning
-  if Vagrant::Util::Platform.windows?
-    config.vm.provision "shell", inline: <<-SHELL
-      sudo apt-get update
-      sudo apt-get install -y sshpass python3-pip
-    SHELL
-    
-    config.vm.provision "ansible_local" do |ansible|
-      ansible.playbook = "../site.yaml"
-      ansible.inventory_path = "../inventory"
-      ansible.limit = "all"
-      ansible.become = true
-      ansible.compatibility_mode = "2.0"
-      ansible.install = true
-      ansible.install_mode = "pip"
-      ansible.extra_vars = {
-        ansible_ssh_pass: "vagrant",
-        ansible_become_pass: "vagrant"
-      }
-    end
-  else
-    config.vm.provision "ansible" do |ansible|
-      ansible.playbook = "../site.yaml"
-      ansible.inventory_path = "../inventory"
-      ansible.limit = "all"
-      ansible.become = true
-      ansible.compatibility_mode = "2.0"
-    end
+  config.vm.provision "ansible", run: "once", after: :all do |ansible|
+    ansible.playbook = "../site.yaml"
+    ansible.inventory_path = "../inventory"
+    ansible.limit = "all"
+    ansible.become = true
+    ansible.compatibility_mode = "2.0"
+    ansible.extra_vars = {
+      ansible_ssh_pass: "vagrant",
+      ansible_become_pass: "vagrant"
+    }
   end
+
 end

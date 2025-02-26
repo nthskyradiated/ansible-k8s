@@ -1,4 +1,11 @@
 ---
+- name: Remove invalid IP line from /etc/environment
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/environment
+    regexp: '^\d{1,3}(\.\d{1,3}){3}$'
+    state: absent
+
 - name: Update and upgrade system packages
   ansible.builtin.apt:
     update_cache: true
