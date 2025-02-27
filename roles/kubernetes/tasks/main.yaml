@@ -8,8 +8,5 @@
 - name: Import kubernetes setup tasks
   ansible.builtin.import_tasks: kubernetes.yaml
 
-- name: Import network components tasks
-  ansible.builtin.import_tasks: network.yaml
-
 - name: Import tools tasks
   ansible.builtin.import_tasks: tools.yaml
