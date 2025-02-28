@@ -51,7 +51,7 @@
     --service-cidr={{ service_cidr }} \
     --control-plane-endpoint={{ control_plane_endpoint }} \
     --skip-phases=addon/kube-proxy \
-    --upload-certs | tee /root/kubeadm-init-output.txt
+    --upload-certs | tee /home/vagrant/kubeadm-init-output.txt
   when: inventory_hostname == 'controlplane01'
   become: true
 
