@@ -54,6 +54,24 @@
         sudo tar xzvfC hubble-linux-${HUBBLE_ARCH}.tar.gz /usr/local/bin
         rm -f hubble-linux-${HUBBLE_ARCH}.tar.gz hubble-linux-${HUBBLE_ARCH}.tar.gz.sha256sum
 
+- name: Install Kubeseal
+  when: inventory_hostname == 'controlplane01'
+  block:
+    - name: Get latest Kubeseal version
+      ansible.builtin.shell: |
+        curl -s https://api.github.com/repos/bitnami-labs/sealed-secrets/tags | jq -r '.[0].name' | cut -c 2-
+      register: kubeseal_version
+      changed_when: false
+
+    - name: Download and install Kubeseal
+      ansible.builtin.shell: |
+        curl -OL "https://github.com/bitnami-labs/sealed-secrets/releases/download/v{{ kubeseal_version.stdout }}/kubeseal-{{ kubeseal_version.stdout }}-linux-amd64.tar.gz"
+        tar -xvzf kubeseal-{{ kubeseal_version.stdout }}-linux-amd64.tar.gz kubeseal
+        sudo install -m 755 kubeseal /usr/local/bin/kubeseal
+        rm -f kubeseal-{{ kubeseal_version.stdout }}-linux-amd64.tar.gz kubeseal
+      args:
+        creates: /usr/local/bin/kubeseal
+
 - name: Configure Cilium with Helm
   when: inventory_hostname == 'controlplane01'
   block:
