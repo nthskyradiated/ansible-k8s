@@ -22,7 +22,7 @@
 
 - name: Install Kubernetes components
   ansible.builtin.apt:
-    name:
+    name: 
       - kubelet
       - kubeadm
       - kubectl
@@ -39,31 +39,28 @@
     - kubeadm
     - kubectl
   become: true
-  notify:
+  notify: 
     - Start and enable kubelet
     - Reload systemd
 
-- name: Check HAProxy status
-  ansible.builtin.wait_for:
-    host: "{{ hostvars['loadbalancer']['ansible_host'] }}"
-    port: 6443
-    timeout: 30
-  register: haproxy_status
+- name: Check if Kubernetes API is responding on loadbalancer
+  ansible.builtin.uri:
+    url: "https://{{ hostvars['loadbalancer']['ansible_host'] }}:6443/version"
+    method: GET
+    validate_certs: no
+    timeout: 5
   ignore_errors: true
-  when: inventory_hostname == 'controlplane01'
+  register: lb_api
 
 - name: Initialize Kubernetes cluster
   ansible.builtin.shell: |
     kubeadm init --pod-network-cidr={{ pod_cidr }} \
     --service-cidr={{ service_cidr }} \
-    {% if haproxy_status is defined and not haproxy_status.failed %}
+    {% if lb_api is succeeded %}
     --control-plane-endpoint="{{ hostvars['loadbalancer']['ansible_host'] }}:6443" \
     {% endif %}
-    --upload-certs \
-    --skip-phases=addon/kube-proxy | tee /home/vagrant/kubeadm-init-output.txt
-  args:
-    creates: /etc/kubernetes/admin.conf
-  register: kubeadm_init
+    --skip-phases=addon/kube-proxy \
+    --upload-certs | tee /home/vagrant/kubeadm-init-output.txt
   when: inventory_hostname == 'controlplane01'
   become: true
 
@@ -74,4 +71,5 @@
     chown vagrant:vagrant /home/vagrant/.kube/config
   when: inventory_hostname == 'controlplane01'
   become: true
-  changed_when: false
+
+

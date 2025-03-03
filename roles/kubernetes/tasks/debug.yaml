@@ -1,0 +1,8 @@
+---
+- name: Debug Kubernetes variables
+  ansible.builtin.debug:
+    msg: |
+      Pod CIDR: {{ pod_cidr }}
+      Service CIDR: {{ service_cidr }}
+      Control Plane Endpoint: {{ hostvars['loadbalancer']['ansible_host'] if 'loadbalancer' in groups else ansible_host }}
+  when: inventory_hostname == 'controlplane01'
