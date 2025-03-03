@@ -1,0 +1,40 @@
+---
+- name: Install HAProxy
+  ansible.builtin.apt:
+    name: haproxy
+    state: present
+    update_cache: true
+  become: true
+  when: "'loadbalancers' in group_names"
+
+- name: Configure HAProxy for Kubernetes
+  ansible.builtin.blockinfile:
+    path: /etc/haproxy/haproxy.cfg
+    block: |
+      frontend kubernetes-frontend
+          bind {{ hostvars['loadbalancer']['ansible_host'] }}:6443
+          mode tcp
+          option tcplog
+          default_backend controlplanes
+
+      backend controlplanes
+          mode tcp
+          option tcp-check
+          balance roundrobin
+          {% for host in groups['controlplanes'] %}
+          server {{ host }} {{ hostvars[host]['ansible_host'] }}:6443 check fall 3 rise 2
+          {% endfor %}
+    marker: "# {mark} ANSIBLE MANAGED BLOCK FOR KUBERNETES"
+    validate: 'haproxy -c -f %s'
+  become: true
+  when: "'loadbalancers' in group_names"
+  notify: Restart HAProxy
+
+- name: Ensure HAProxy is started and enabled
+  ansible.builtin.service:
+    name: haproxy
+    state: started
+    enabled: true
+  become: true
+  when: "'loadbalancers' in group_names"
+  

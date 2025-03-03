@@ -66,7 +66,7 @@ def provision_kubernetes_node(node)
 end
 
 
-NUM_CONTROL_NODES = 1
+NUM_CONTROL_NODES = 2
 NUM_WORKER_NODE = 2
 MASTER_IP_START = 210
 NODE_IP_START = 220
@@ -104,7 +104,7 @@ Vagrant.configure("2") do |config|
       node.vm.provider "hyperv" do |hv|
         hv.vmname = "kubernetes-ha-controlplane-#{i}"
         # hv.memory = RESOURCES["control"][i > 2 ? 2 : i]["ram"]
-        hv.memory = 3072
+        hv.memory = 2048
         hv.maxmemory = 3584
         hv.cpus = RESOURCES["control"][i > 2 ? 2 : i]["cpu"]
         hv.enable_virtualization_extensions = true
@@ -115,7 +115,6 @@ Vagrant.configure("2") do |config|
         s.args = ["eth0", "#{IP_NW}#{MASTER_IP_START + i}", "#{IP_NW}1"]
       end
       setup_dns(node)
-      setup_ssh(node)
       provision_kubernetes_node(node)
       if i == 1
         node.vm.provision "file", source: "./ubuntu/vimrc", destination: "$HOME/.vimrc"
@@ -148,7 +147,7 @@ Vagrant.configure("2") do |config|
       node.vm.provider "hyperv" do |hv|
         hv.vmname = "kubernetes-ha-node-#{i}"
         # hv.memory = RESOURCES["worker"]["ram"]
-        hv.memory = 3584
+        hv.memory = 2048
         hv.maxmemory = 4096
         hv.cpus = RESOURCES["worker"]["cpu"]
         hv.ip_address_timeout = 300
@@ -158,7 +157,6 @@ Vagrant.configure("2") do |config|
         s.args = ["eth0", "#{IP_NW}#{NODE_IP_START + i}", "#{IP_NW}1"]
       end
       setup_dns(node)
-      setup_ssh(node)
       provision_kubernetes_node(node)
       if i == NUM_WORKER_NODE
         node.vm.provision :ansible do |ansible|

@@ -5,6 +5,7 @@
     state: directory
     mode: '0755'
   become: true
+  when: "'loadbalancers' not in group_names"
 
 - name: Download Kubernetes GPG key
   ansible.builtin.get_url:
@@ -21,12 +22,13 @@
 
 - name: Install Kubernetes components
   ansible.builtin.apt:
-    name: 
+    name:
       - kubelet
       - kubeadm
       - kubectl
     state: present
   become: true
+  when: "'loadbalancers' not in group_names"
 
 - name: Hold Kubernetes packages
   ansible.builtin.dpkg_selections:
@@ -37,21 +39,31 @@
     - kubeadm
     - kubectl
   become: true
+  notify:
+    - Start and enable kubelet
+    - Reload systemd
 
-- name: Enable kubelet
-  ansible.builtin.systemd:
-    name: kubelet
-    enabled: yes
-    state: started
-  become: true
+- name: Check HAProxy status
+  ansible.builtin.wait_for:
+    host: "{{ hostvars['loadbalancer']['ansible_host'] }}"
+    port: 6443
+    timeout: 30
+  register: haproxy_status
+  ignore_errors: true
+  when: inventory_hostname == 'controlplane01'
 
 - name: Initialize Kubernetes cluster
   ansible.builtin.shell: |
     kubeadm init --pod-network-cidr={{ pod_cidr }} \
     --service-cidr={{ service_cidr }} \
-    --control-plane-endpoint={{ control_plane_endpoint }} \
-    --skip-phases=addon/kube-proxy \
-    --upload-certs | tee /home/vagrant/kubeadm-init-output.txt
+    {% if haproxy_status is defined and not haproxy_status.failed %}
+    --control-plane-endpoint="{{ hostvars['loadbalancer']['ansible_host'] }}:6443" \
+    {% endif %}
+    --upload-certs \
+    --skip-phases=addon/kube-proxy | tee /home/vagrant/kubeadm-init-output.txt
+  args:
+    creates: /etc/kubernetes/admin.conf
+  register: kubeadm_init
   when: inventory_hostname == 'controlplane01'
   become: true
 
@@ -62,5 +74,4 @@
     chown vagrant:vagrant /home/vagrant/.kube/config
   when: inventory_hostname == 'controlplane01'
   become: true
-
-
+  changed_when: false

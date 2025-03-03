@@ -2,11 +2,16 @@
 - name: Import prerequisites tasks
   ansible.builtin.import_tasks: prerequisites.yaml
 
+- name: Import HAProxy tasks
+  ansible.builtin.import_tasks: haproxy.yaml
+  when: "'loadbalancers' in group_names"
+
 - name: Import containerd setup tasks
   ansible.builtin.import_tasks: containerd.yaml
 
 - name: Import kubernetes setup tasks
   ansible.builtin.import_tasks: kubernetes.yaml
+  when: "'loadbalancers' not in group_names"
 
 - name: Import tools tasks
   ansible.builtin.import_tasks: tools.yaml

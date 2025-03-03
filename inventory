@@ -6,7 +6,7 @@ controlplane02 ansible_host=192.168.1.212
 node01 ansible_host=192.168.1.221
 node02 ansible_host=192.168.1.222
 
-[loadbalancer]
+[loadbalancers]
 loadbalancer ansible_host=192.168.1.200
 
 [all:vars]
