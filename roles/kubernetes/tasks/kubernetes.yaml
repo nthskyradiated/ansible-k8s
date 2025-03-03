@@ -43,20 +43,17 @@
     - Start and enable kubelet
     - Reload systemd
 
-- name: Check if Kubernetes API is responding on loadbalancer
-  ansible.builtin.uri:
-    url: "https://{{ hostvars['loadbalancer']['ansible_host'] }}:6443/version"
-    method: GET
-    validate_certs: no
-    timeout: 5
+- name: Check if loadbalancer is reachable
+  ansible.builtin.ping:
+  delegate_to: "{{ hostvars['loadbalancer']['ansible_host'] }}"
   ignore_errors: true
-  register: lb_api
+  register: lb_ping
 
 - name: Initialize Kubernetes cluster
   ansible.builtin.shell: |
     kubeadm init --pod-network-cidr={{ pod_cidr }} \
     --service-cidr={{ service_cidr }} \
-    {% if lb_api is succeeded %}
+    {% if lb_ping is succeeded %}
     --control-plane-endpoint="{{ hostvars['loadbalancer']['ansible_host'] }}:6443" \
     {% endif %}
     --skip-phases=addon/kube-proxy \
