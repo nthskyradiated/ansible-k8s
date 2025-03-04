@@ -1,13 +1,13 @@
 ---
 - name: Wait for APT locks
-  shell: |
-    while lsof /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || lsof /var/lib/apt/lists/lock >/dev/null 2>&1 || lsof /var/lib/dpkg/lock >/dev/null 2>&1; do
-      echo "Waiting for other APT processes to finish..."
-      sleep 5
-    done
-  register: apt_wait
-  changed_when: false
+  ansible.builtin.wait_for:
+    path: "{{ item }}"
+    state: absent
+    timeout: 90  # 5 minutes timeout
+    sleep: 5      # Check every 5 seconds
+  loop:
+    - /var/lib/dpkg/lock-frontend
+    - /var/lib/apt/lists/lock
+    - /var/lib/dpkg/lock
   become: true
-  retries: 10
-  delay: 5
-  until: apt_wait is success
+  register: apt_wait

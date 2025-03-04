@@ -22,7 +22,7 @@
 
 - name: Install Kubernetes components
   ansible.builtin.apt:
-    name: 
+    name:
       - kubelet
       - kubeadm
       - kubectl
@@ -30,7 +30,7 @@
   become: true
   when: "'loadbalancers' not in group_names"
   register: install_k8s
-  retries: 10
+  retries: 5
   delay: 5
   until: install_k8s is success
 
@@ -43,32 +43,56 @@
     - kubeadm
     - kubectl
   become: true
-  notify: 
+  notify:
     - Start and enable kubelet
     - Reload systemd
 
+- name: Set loadbalancer facts
+  ansible.builtin.set_fact:
+    lb_available: "{{ 'loadbalancer' in groups and groups['loadbalancer'] | length > 0 }}"
+    
 - name: Check if loadbalancer is reachable
   ansible.builtin.ping:
   delegate_to: "{{ hostvars['loadbalancer']['ansible_host'] }}"
   ignore_errors: true
   register: lb_ping
+  when: lb_available | bool
 
 - name: Initialize Kubernetes cluster
   ansible.builtin.shell: |
-    kubeadm init --pod-network-cidr={{ pod_cidr }} \
+    # Reset any previous failed attempts
+    kubeadm reset -f
+    # Initialize cluster with conditional endpoint
+    kubeadm init \
+    --pod-network-cidr={{ pod_cidr }} \
     --service-cidr={{ service_cidr }} \
-    {% if lb_ping is succeeded %}
+    {% if lb_available and lb_ping is success %}
     --control-plane-endpoint="{{ hostvars['loadbalancer']['ansible_host'] }}:6443" \
     {% endif %}
-    --skip-phases=addon/kube-proxy \
-    --upload-certs | tee /home/vagrant/kubeadm-init-output.txt
+    --upload-certs \
+    --skip-phases=addon/kube-proxy 2>&1 | tee /home/vagrant/kubeadm-init-output.txt
+  when: inventory_hostname == 'controlplane01'
+  become: true
+  changed_when: false
+
+- name: Ensure .kube directory exists
+  ansible.builtin.file:
+    path: /home/vagrant/.kube
+    state: directory
+    owner: vagrant
+    group: vagrant
+    mode: '0755'
   when: inventory_hostname == 'controlplane01'
   become: true
 
-- name: Copy kubeconfig to vagrant home
-  ansible.builtin.shell: |
-    mkdir -p /home/vagrant/.kube
-    cp -i /etc/kubernetes/admin.conf /home/vagrant/.kube/config
-    chown vagrant:vagrant /home/vagrant/.kube/config
+- name: Copy kubeconfig
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/vagrant/.kube/config
+    remote_src: true
+    owner: vagrant
+    group: vagrant
+    mode: '0600'
   when: inventory_hostname == 'controlplane01'
   become: true
+  changed_when: false
