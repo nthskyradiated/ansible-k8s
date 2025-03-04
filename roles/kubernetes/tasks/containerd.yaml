@@ -11,6 +11,10 @@
     repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
     state: present
   become: true
+  # register: apt_docker_repo
+  # retries: 10
+  # delay: 5
+  # until: apt_docker_repo is success
 
 - name: Install containerd
   ansible.builtin.apt:
@@ -18,6 +22,10 @@
     state: present
     update_cache: true
   become: true
+  # register: install_containerd
+  # retries: 10
+  # delay: 5
+  # until: install_containerd is success
 
 - name: Configure containerd
   ansible.builtin.shell: |

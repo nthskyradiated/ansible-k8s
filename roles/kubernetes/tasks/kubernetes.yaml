@@ -29,6 +29,10 @@
     state: present
   become: true
   when: "'loadbalancers' not in group_names"
+  register: install_k8s
+  retries: 10
+  delay: 5
+  until: install_k8s is success
 
 - name: Hold Kubernetes packages
   ansible.builtin.dpkg_selections:
@@ -68,5 +72,3 @@
     chown vagrant:vagrant /home/vagrant/.kube/config
   when: inventory_hostname == 'controlplane01'
   become: true
-
-

@@ -1,4 +1,7 @@
 ---
+- name: Import APT lock handling
+  ansible.builtin.import_tasks: apt-lock.yaml
+
 - name: Import prerequisites tasks
   ansible.builtin.import_tasks: prerequisites.yaml
 
