@@ -49,14 +49,17 @@
 
 - name: Set loadbalancer facts
   ansible.builtin.set_fact:
-    lb_available: "{{ 'loadbalancer' in groups and groups['loadbalancer'] | length > 0 }}"
-    
+    lb_available: "{{ groups['loadbalancers'] is defined and groups['loadbalancers'] | length > 0 }}"
+   
 - name: Check if loadbalancer is reachable
-  ansible.builtin.ping:
-  delegate_to: "{{ hostvars['loadbalancer']['ansible_host'] }}"
-  ignore_errors: true
+  ansible.builtin.uri:
+    url: "https://{{ hostvars['loadbalancer']['ansible_host'] }}:6443/version"
+    validate_certs: false
   register: lb_ping
-  when: lb_available | bool
+  when: 
+    - lb_available | bool
+    - inventory_hostname == 'controlplane01'
+  ignore_errors: true
 
 - name: Initialize Kubernetes cluster
   ansible.builtin.shell: |
@@ -69,7 +72,7 @@
     {% if lb_available and lb_ping is success %}
     --control-plane-endpoint="{{ hostvars['loadbalancer']['ansible_host'] }}:6443" \
     {% endif %}
-    --upload-certs \
+    --upload-certs --v=5 \
     --skip-phases=addon/kube-proxy 2>&1 | tee /home/vagrant/kubeadm-init-output.txt
   when: inventory_hostname == 'controlplane01'
   become: true
