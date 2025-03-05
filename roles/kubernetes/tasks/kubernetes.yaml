@@ -50,15 +50,14 @@
 - name: Set loadbalancer facts
   ansible.builtin.set_fact:
     lb_available: "{{ groups['loadbalancers'] is defined and groups['loadbalancers'] | length > 0 }}"
-   
+
 - name: Check if loadbalancer is reachable
-  ansible.builtin.uri:
-    url: "https://{{ hostvars['loadbalancer']['ansible_host'] }}:6443/version"
-    validate_certs: false
+  ansible.builtin.ping:
   register: lb_ping
+  delegate_facts: true
   when: 
     - lb_available | bool
-    - inventory_hostname == 'controlplane01'
+    - inventory_hostname == 'loadbalancer'
   ignore_errors: true
 
 - name: Initialize Kubernetes cluster
