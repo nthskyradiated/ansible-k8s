@@ -51,31 +51,43 @@
   ansible.builtin.set_fact:
     lb_available: "{{ groups['loadbalancers'] is defined and groups['loadbalancers'] | length > 0 }}"
 
+- name: Ensure HAProxy is restarted before initializing Kubernetes
+  ansible.builtin.systemd:
+    name: haproxy
+    state: restarted
+  delegate_to: loadbalancer
+  when: lb_available | bool
+  become: true
+  run_once: true
+
 - name: Check if loadbalancer is reachable
   ansible.builtin.ping:
   register: lb_ping
   delegate_facts: true
   when: 
     - lb_available | bool
-    - inventory_hostname == 'loadbalancer'
+    - inventory_hostname == 'controlplane01'
   ignore_errors: true
 
 - name: Initialize Kubernetes cluster
-  ansible.builtin.shell: |
-    # Reset any previous failed attempts
-    kubeadm reset -f
-    # Initialize cluster with conditional endpoint
-    kubeadm init \
-    --pod-network-cidr={{ pod_cidr }} \
-    --service-cidr={{ service_cidr }} \
+  ansible.builtin.shell: >
+    kubeadm init --pod-network-cidr={{ pod_cidr }} --service-cidr={{ service_cidr }}
     {% if lb_available and lb_ping is success %}
-    --control-plane-endpoint="{{ hostvars['loadbalancer']['ansible_host'] }}:6443" \
+    --control-plane-endpoint="{{ hostvars['loadbalancer']['ansible_host'] }}:6443" --apiserver-advertise-address={{ ansible_host }}
     {% endif %}
-    --upload-certs --v=5 \
-    --skip-phases=addon/kube-proxy 2>&1 | tee /home/vagrant/kubeadm-init-output.txt
+    --upload-certs --skip-phases=addon/kube-proxy 2>&1
   when: inventory_hostname == 'controlplane01'
   become: true
+  register: kubeadm_init_output
   changed_when: false
+  async: 300
+  poll: 10
+
+- name: Save kubeadm init output to a file
+  ansible.builtin.copy:
+    content: "{{ kubeadm_init_output.stdout }}"
+    dest: "/home/vagrant/kubeadm-init-output.txt"
+  when: inventory_hostname == 'controlplane01'
 
 - name: Ensure .kube directory exists
   ansible.builtin.file:
