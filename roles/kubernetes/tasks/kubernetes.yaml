@@ -64,7 +64,7 @@
   ansible.builtin.ping:
   register: lb_ping
   delegate_facts: true
-  when: 
+  when:
     - lb_available | bool
     - inventory_hostname == 'controlplane01'
   ignore_errors: true
@@ -81,15 +81,24 @@
   register: kubeadm_init_output
   changed_when: false
   async: 300
-  poll: 10
+  poll: 0
+
+- name: Wait for kubeadm init to complete
+  ansible.builtin.async_status:
+    jid: "{{ kubeadm_init_output.ansible_job_id }}"
+  register: kubeadm_result
+  until: kubeadm_result.finished
+  retries: 30
+  delay: 10
+  when: inventory_hostname == 'controlplane01'
 
 - name: Save kubeadm init output to a file
   ansible.builtin.copy:
-    content: "{{ kubeadm_init_output.stdout }}"
+    content: "{{ kubeadm_result.stdout }}"
     dest: "/home/vagrant/kubeadm-init-output.txt"
   when: inventory_hostname == 'controlplane01'
 
-- name: Ensure .kube directory exists
+- name: Ensure .kube directory exists on controlplane01
   ansible.builtin.file:
     path: /home/vagrant/.kube
     state: directory
@@ -110,3 +119,32 @@
   when: inventory_hostname == 'controlplane01'
   become: true
   changed_when: false
+
+- name: Ensure .kube directory exists on Ansible host
+  ansible.builtin.file:
+    path: /home/andy/.kube
+    state: directory
+    owner: andy
+    group: andy
+    mode: '0700'
+  delegate_to: localhost
+  run_once: true
+  become: false
+  ignore_errors: true
+
+# - name: Ensure .kube directory exists on Ansible host
+#   ansible.builtin.file:
+#     path: /home/andy/.kube  # Adjust to your local path
+#     state: directory
+#     mode: '0700'
+#   local_action:  # Run on the Ansible control machine
+#     delegate_to: localhost
+#   become: false
+  
+- name: Export kubeconfig to Ansible host
+  ansible.builtin.fetch:
+    src: /home/vagrant/.kube/config  # This is where the file was copied internally
+    dest: /home/andy/.kube/config  # Local path on your Ansible machine
+    flat: true
+  when: inventory_hostname == 'controlplane01'
+  become: true
