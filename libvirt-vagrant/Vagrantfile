@@ -12,10 +12,10 @@ end
 
 RESOURCES = {
   "control" => {
-    1 => { "ram" => 2048, "cpu" => CPU_CORES >= 12 ? 4 : 2 },
-    2 => { "ram" => 2048, "cpu" => CPU_CORES > 8 ? 2 : 1 }
+    1 => { "ram" => 4096, "cpu" => CPU_CORES >= 12 ? 4 : 2 },
+    2 => { "ram" => 4096, "cpu" => CPU_CORES > 8 ? 2 : 1 }
   },
-  "worker" => { "ram" => 2048, "cpu" => 2 }
+  "worker" => { "ram" => 4096, "cpu" => 2 }
 }
 
 def setup_dns(node)
@@ -57,7 +57,7 @@ def provision_kubernetes_node(node)
 end
 
 
-NUM_CONTROL_NODES = 1
+NUM_CONTROL_NODES = 2
 NUM_WORKER_NODE = 2
 MASTER_IP_START = 210
 NODE_IP_START = 220
@@ -126,7 +126,7 @@ config.vm.box_version = "202502.21.0"
     config.vm.define "loadbalancer" do |node|
       node.vm.hostname = "loadbalancer"
       node.vm.provider :libvirt do |lv|
-        lv.memory = 1024
+        lv.memory = 2048
         lv.cpus = 1
         lv.storage :file, :size => '20G'
       end
