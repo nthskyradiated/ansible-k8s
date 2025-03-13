@@ -77,6 +77,12 @@
     - inventory_hostname == 'controlplane01'
   ignore_errors: true
 
+- name: Reset kubeadm configuration
+  ansible.builtin.shell: kubeadm reset -f
+  when: inventory_hostname == 'controlplane01'
+  become: true
+  ignore_errors: true
+
 - name: Initialize Kubernetes cluster
   ansible.builtin.shell: >
     kubeadm init --pod-network-cidr={{ pod_cidr }} --service-cidr={{ service_cidr }}
@@ -140,19 +146,37 @@
   become: false
   ignore_errors: true
 
-# - name: Ensure .kube directory exists on Ansible host
-#   ansible.builtin.file:
-#     path: /home/andy/.kube  # Adjust to your local path
-#     state: directory
-#     mode: '0700'
-#   local_action:  # Run on the Ansible control machine
-#     delegate_to: localhost
-#   become: false
   
-- name: Export kubeconfig to Ansible host
+# - name: Export kubeconfig to Ansible host
+#   ansible.builtin.fetch:
+#     src: /home/vagrant/.kube/config  # This is where the file was copied internally
+#     dest: /home/andy/.kube/config  # Local path on your Ansible machine
+#     flat: true
+#   when: inventory_hostname == 'controlplane01'
+#   become_user: andy
+
+- name: Export kubeconfig to temporary location
   ansible.builtin.fetch:
-    src: /home/vagrant/.kube/config  # This is where the file was copied internally
-    dest: /home/andy/.kube/config  # Local path on your Ansible machine
+    src: /home/vagrant/.kube/config
+    dest: "/tmp/k8s-config-{{ ansible_date_time.epoch }}"
     flat: true
   when: inventory_hostname == 'controlplane01'
   become: true
+  register: temp_kubeconfig
+
+- name: Move kubeconfig to final location
+  ansible.builtin.command: "mv {{ temp_kubeconfig.dest }} /home/andy/.kube/config"
+  delegate_to: localhost
+  when: inventory_hostname == 'controlplane01' and temp_kubeconfig is defined
+  become: true
+  become_user: andy
+
+- name: Set correct ownership and permissions on kubeconfig
+  ansible.builtin.file:
+    path: /home/andy/.kube/config
+    owner: andy
+    group: andy
+    mode: '0600'
+  delegate_to: localhost
+  when: inventory_hostname == 'controlplane01'
+  become: false
