@@ -1,13 +1,13 @@
 [controlplanes]
-controlplane01 ansible_host=192.168.1.211
-controlplane02 ansible_host=192.168.1.212
+controlplane01 ansible_host=192.168.100.111
+controlplane02 ansible_host=192.168.100.112
 
 [workernodes]
-node01 ansible_host=192.168.1.221
-node02 ansible_host=192.168.1.222
+node01 ansible_host=192.168.100.121
+node02 ansible_host=192.168.100.122
 
 [loadbalancers]
-loadbalancer ansible_host=192.168.1.200
+loadbalancer ansible_host=192.168.100.100
 
 [all:vars]
 ansible_connection=ssh
