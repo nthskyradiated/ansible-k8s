@@ -57,7 +57,7 @@ def provision_kubernetes_node(node)
 end
 
 
-NUM_CONTROL_NODES = 2
+NUM_CONTROL_NODES = 1
 NUM_WORKER_NODE = 2
 MASTER_IP_START = 210
 NODE_IP_START = 220
