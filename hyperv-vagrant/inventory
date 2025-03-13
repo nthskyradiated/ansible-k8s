@@ -1,0 +1,16 @@
+[controlplanes]
+controlplane01 ansible_host=192.168.1.211
+controlplane02 ansible_host=192.168.1.212
+
+[workernodes]
+node01 ansible_host=192.168.1.221
+node02 ansible_host=192.168.1.222
+
+[loadbalancers]
+loadbalancer ansible_host=192.168.1.200
+
+[all:vars]
+ansible_connection=ssh
+ansible_user=vagrant
+ansible_ssh_private_key_file=/home/vagrant/.vagrant.d/insecure_private_key
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
