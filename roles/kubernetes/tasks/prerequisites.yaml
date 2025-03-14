@@ -28,7 +28,8 @@
   ansible.builtin.shell: |
     swapoff -a
     sed -i '/ swap / s/^/#/' /etc/fstab
-    rm -f /swapfile
+    sed -i '/\/swap.img/ s/^/#/' /etc/fstab
+    rm -f /swapfile /swap.img
   become: true
 
 - name: Configure kernel modules
