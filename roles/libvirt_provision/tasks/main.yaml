@@ -1,0 +1,177 @@
+---
+- name: Initialize control plane list
+  set_fact:
+    cp: []
+
+- name: Build control plane list
+  set_fact:
+    cp: "{{ cp + [ { 'name': 'controlplane%02d'|format(item), 'memory': 4096, 'vcpus': 2, 'disk_size': 20, 'os_variant': 'ubuntu24.04', 'ip': '192.168.100.%d'|format(210 + item) } ] }}"
+  loop: "{{ range(1, (control_planes|int) + 1) | list }}"
+
+- name: Initialize worker node list
+  set_fact:
+    wn: []
+
+- name: Build worker node list
+  set_fact:
+    wn: "{{ wn + [ { 'name': 'node%02d'|format(item), 'memory': 4096, 'vcpus': 2, 'disk_size': 20, 'os_variant': 'ubuntu24.04', 'ip': '192.168.100.%d'|format(220 + item) } ] }}"
+  loop: "{{ range(1, (worker_nodes|int) + 1) | list }}"
+
+- name: Build loadbalancer list if needed
+  set_fact:
+    lb: "{{ [ { 'name': 'loadbalancer', 'memory': 2048, 'vcpus': 1, 'disk_size': 20, 'os_variant': 'ubuntu24.04', 'ip': '192.168.100.200' } ] if (control_planes|int) > 1 else [] }}"
+
+- name: Combine all VM definitions
+  set_fact:
+    vms: "{{ cp + wn + lb }}"
+
+- name: Install required packages (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name:
+      - cloud-image-utils
+      - cloud-utils
+      - qemu-utils
+    state: present
+    update_cache: yes
+  become: true
+  when: ansible_os_family == "Debian"
+
+- name: Enable EPEL Repository (RedHat/Fedora)
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+  become: true
+  when: ansible_os_family == "RedHat"
+
+- name: Install required packages (RedHat/Fedora)
+  ansible.builtin.dnf:
+    name:
+      - cloud-init
+      - cloud-utils-growpart
+      - genisoimage
+      - qemu-img
+      - libvirt
+      - libvirt-client
+    state: present
+  become: true
+  when: ansible_os_family == "RedHat"
+
+- name: Download Ubuntu cloud image
+  ansible.builtin.get_url:
+    url: "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+    dest: "/var/lib/libvirt/images/ubuntu-base.qcow2"
+    mode: '0644'
+  become: true
+
+- name: Create base disk images for VMs
+  ansible.builtin.command: "qemu-img create -f qcow2 -F qcow2 -b /var/lib/libvirt/images/ubuntu-base.qcow2 /var/lib/libvirt/images/{{ item.name }}.qcow2 {{ item.disk_size }}G"
+  args:
+    creates: "/var/lib/libvirt/images/{{ item.name }}.qcow2"
+  become: true
+  loop: "{{ vms }}"
+
+- name: Create cloud-init configs
+  ansible.builtin.template:
+    src: cloud-init.cfg.j2
+    dest: "/var/lib/libvirt/images/{{ item.name }}-cloud-init.cfg"
+    mode: '0644'
+  become: true
+  loop: "{{ vms }}"
+
+- name: Generate cloud-init ISOs
+  ansible.builtin.shell: |
+    genisoimage -output /var/lib/libvirt/images/{{ item.name }}-cloud-init.iso \
+      -volid cidata -joliet -rock -input-charset utf-8 \
+      /var/lib/libvirt/images/{{ item.name }}-cloud-init.cfg
+  args:
+    creates: "/var/lib/libvirt/images/{{ item.name }}-cloud-init.iso"
+  become: true
+  loop: "{{ vms }}"
+
+- name: Create default network configuration
+  ansible.builtin.shell: |
+    virsh net-define /dev/stdin <<EOF
+    <network>
+      <name>default</name>
+      <bridge name='virbr0'/>
+      <forward mode='nat'/>
+      <ip address='192.168.100.1' netmask='255.255.255.0'>
+        <dhcp>
+          <range start='192.168.100.128' end='192.168.100.254'/>
+        </dhcp>
+      </ip>
+    </network>
+    EOF
+  become: true
+  ignore_errors: true  # In case network already exists
+
+- name: Start default network
+  ansible.builtin.command: "virsh net-start default"
+  become: true
+  ignore_errors: true  # In case network is already running
+
+- name: Set network to autostart
+  ansible.builtin.command: "virsh net-autostart default"
+  become: true
+  ignore_errors: true
+
+- name: Define VMs using virsh
+  ansible.builtin.shell: |
+    virsh define /dev/stdin <<EOF
+    <domain type='kvm'>
+      <name>{{ item.name }}</name>
+      <memory unit='MiB'>{{ item.memory }}</memory>
+      <vcpu>{{ item.vcpus }}</vcpu>
+      <os>
+        <type arch='x86_64' machine='pc'>hvm</type>
+        <boot dev='hd'/>
+      </os>
+      <devices>
+        <disk type='file' device='disk'>
+          <driver name='qemu' type='qcow2'/>
+          <source file='/var/lib/libvirt/images/{{ item.name }}.qcow2'/>
+          <target dev='vda' bus='virtio'/>
+        </disk>
+        <disk type='file' device='cdrom'>
+          <driver name='qemu' type='raw'/>
+          <source file='/var/lib/libvirt/images/{{ item.name }}-cloud-init.iso'/>
+          <target dev='hdb' bus='ide'/>
+          <readonly/>
+        </disk>
+        <interface type='network'>
+          <source network='default'/>
+          <model type='virtio'/>
+        </interface>
+        <graphics type='vnc'/>
+        <serial type='pty'>
+          <target port='0'/>
+        </serial>
+        <console type='pty'>
+          <target type='serial' port='0'/>
+        </console>
+      </devices>
+    </domain>
+    EOF
+  become: true
+  loop: "{{ vms }}"
+
+- name: Start VMs using virsh
+  ansible.builtin.command: "virsh start {{ item.name }}"
+  become: true
+  loop: "{{ vms }}"
+  ignore_errors: true  # In case VM is already running
+
+- name: Wait for VMs to be accessible
+  wait_for:
+    host: "{{ item.ip }}"
+    port: 22
+    timeout: 300
+  loop: "{{ vms }}"
+
+- name: Set host naming on provisioned VMs
+  ansible.builtin.command: "hostnamectl set-hostname {{ item.name }}"
+  delegate_to: "{{ item.name }}"
+  loop: "{{ vms }}"
+  when: vms is defined
+  ignore_unreachable: yes
+  ignore_errors: yes

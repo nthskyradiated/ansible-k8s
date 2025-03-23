@@ -1,0 +1,31 @@
+vms:
+  - name: controlplane01
+    memory: 4096
+    vcpus: 2
+    disk_size: 20   # size in GB
+    os_variant: ubuntu24.04
+    network: default
+  - name: controlplane02
+    memory: 4096
+    vcpus: 2
+    disk_size: 20
+    os_variant: ubuntu24.04
+    network: default
+  - name: loadbalancer
+    memory: 2048
+    vcpus: 1
+    disk_size: 20
+    os_variant: ubuntu24.04
+    network: default
+  - name: node01
+    memory: 4096
+    vcpus: 2
+    disk_size: 20
+    os_variant: ubuntu24.04
+    network: default
+  - name: node02
+    memory: 4096
+    vcpus: 2
+    disk_size: 20
+    os_variant: ubuntu24.04
+    network: default
