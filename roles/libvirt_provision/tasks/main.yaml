@@ -31,6 +31,10 @@
       - cloud-image-utils
       - cloud-utils
       - qemu-utils
+      - qemu-system-x86
+      - qemu-kvm
+      - libvirt-daemon-system
+      - libvirt-clients
     state: present
     update_cache: yes
   become: true
@@ -50,11 +54,21 @@
       - cloud-utils-growpart
       - genisoimage
       - qemu-img
+      - qemu-kvm
+      - qemu-kvm-core
       - libvirt
       - libvirt-client
+      - libvirt-daemon
+      - libvirt-daemon-driver-qemu
+      - libguestfs-tools
+      - virt-install
     state: present
   become: true
   when: ansible_os_family == "RedHat"
+
+- name: Set QEMU emulator path based on OS
+  set_fact:
+    qemu_emulator_path: "{{ '/usr/libexec/qemu-kvm' if ansible_os_family == 'RedHat' else '/usr/bin/kvm' }}"
 
 - name: Download Ubuntu cloud image
   ansible.builtin.get_url:
@@ -70,50 +84,107 @@
   become: true
   loop: "{{ vms }}"
 
-- name: Create cloud-init configs
+- name: Create cloud-init configs for each VM
   ansible.builtin.template:
-    src: cloud-init.cfg.j2
-    dest: "/var/lib/libvirt/images/{{ item.name }}-cloud-init.cfg"
+    src: "{{ item[0] }}.j2"
+    dest: "/var/lib/libvirt/images/{{ item[1].name }}-{{ item[0] }}"
     mode: '0644'
   become: true
-  loop: "{{ vms }}"
+  with_nested:
+    - ['meta-data', 'user-data', 'network-config']
+    - "{{ vms }}"
+  loop_control:
+    loop_var: item
 
-- name: Generate cloud-init ISOs
+- name: Generate cloud-init ISOs for VMs
   ansible.builtin.shell: |
-    genisoimage -output /var/lib/libvirt/images/{{ item.name }}-cloud-init.iso \
+    cd /var/lib/libvirt/images && \
+    genisoimage -output {{ item.name }}-cloud-init.iso \
       -volid cidata -joliet -rock -input-charset utf-8 \
-      /var/lib/libvirt/images/{{ item.name }}-cloud-init.cfg
+      {{ item.name }}-meta-data {{ item.name }}-user-data {{ item.name }}-network-config
   args:
     creates: "/var/lib/libvirt/images/{{ item.name }}-cloud-init.iso"
   become: true
   loop: "{{ vms }}"
 
-- name: Create default network configuration
-  ansible.builtin.shell: |
-    virsh net-define /dev/stdin <<EOF
-    <network>
-      <name>default</name>
-      <bridge name='virbr0'/>
-      <forward mode='nat'/>
-      <ip address='192.168.100.1' netmask='255.255.255.0'>
-        <dhcp>
-          <range start='192.168.100.128' end='192.168.100.254'/>
-        </dhcp>
-      </ip>
-    </network>
-    EOF
-  become: true
-  ignore_errors: true  # In case network already exists
+- name: Get list of active networks
+  ansible.builtin.shell: "virsh net-list --all | grep -E '^\ +.*running' | awk '{print $1}'"
+  register: active_networks
+  changed_when: false
 
-- name: Start default network
-  ansible.builtin.command: "virsh net-start default"
-  become: true
-  ignore_errors: true  # In case network is already running
+- name: Get list of inactive networks
+  ansible.builtin.shell: "virsh net-list --all | grep -E '^\ +.*inactive' | awk '{print $1}'"
+  register: inactive_networks
+  changed_when: false
 
-- name: Set network to autostart
-  ansible.builtin.command: "virsh net-autostart default"
-  become: true
+- name: Stop active networks
+  ansible.builtin.command: "virsh net-destroy {{ item }}"
+  with_items: "{{ active_networks.stdout_lines }}"
   ignore_errors: true
+  become: true
+
+- name: Undefine all networks
+  ansible.builtin.command: "virsh net-undefine {{ item }}"
+  with_items: "{{ active_networks.stdout_lines + inactive_networks.stdout_lines }}"
+  ignore_errors: true
+  become: true
+
+- name: Create and start default network
+  block:
+    - name: Define default network
+      ansible.builtin.shell: |
+        virsh net-define /dev/stdin <<EOF
+        <network>
+          <name>default</name>
+          <bridge name='virbr0'/>
+          <forward mode='nat'/>
+          <ip address='192.168.100.1' netmask='255.255.255.0'>
+            <dhcp>
+              <range start='192.168.100.128' end='192.168.100.254'/>
+            </dhcp>
+          </ip>
+        </network>
+        EOF
+      become: true
+
+    - name: Start default network
+      ansible.builtin.command: "virsh net-start default"
+      become: true
+
+    - name: Enable autostart for default network
+      ansible.builtin.command: "virsh net-autostart default"
+      become: true
+  rescue:
+    - name: Cleanup and retry network setup
+      block:
+        - name: Force destroy default network
+          ansible.builtin.shell: |
+            virsh net-destroy default || true
+            virsh net-undefine default || true
+          become: true
+        
+        - name: Retry network creation
+          ansible.builtin.shell: |
+            virsh net-define /dev/stdin <<EOF
+            <network>
+              <name>default</name>
+              <bridge name='virbr0'/>
+              <forward mode='nat'/>
+              <ip address='192.168.100.1' netmask='255.255.255.0'>
+                <dhcp>
+                  <range start='192.168.100.128' end='192.168.100.254'/>
+                </dhcp>
+              </ip>
+            </network>
+            EOF
+            virsh net-start default
+            virsh net-autostart default
+          become: true
+
+- name: Get supported machine types
+  ansible.builtin.shell: "qemu-system-x86_64 -machine help | grep pc-q35 | head -n1 | awk '{print $1}'"
+  register: machine_type
+  changed_when: false
 
 - name: Define VMs using virsh
   ansible.builtin.shell: |
@@ -123,10 +194,16 @@
       <memory unit='MiB'>{{ item.memory }}</memory>
       <vcpu>{{ item.vcpus }}</vcpu>
       <os>
-        <type arch='x86_64' machine='pc'>hvm</type>
+        <type arch='x86_64'>hvm</type>
         <boot dev='hd'/>
       </os>
+      <features>
+        <acpi/>
+        <apic/>
+      </features>
+      <cpu mode='host-model'/>
       <devices>
+        <emulator>{{ qemu_emulator_path }}</emulator>
         <disk type='file' device='disk'>
           <driver name='qemu' type='qcow2'/>
           <source file='/var/lib/libvirt/images/{{ item.name }}.qcow2'/>
@@ -135,20 +212,16 @@
         <disk type='file' device='cdrom'>
           <driver name='qemu' type='raw'/>
           <source file='/var/lib/libvirt/images/{{ item.name }}-cloud-init.iso'/>
-          <target dev='hdb' bus='ide'/>
+          <target dev='sda' bus='sata'/>
           <readonly/>
         </disk>
         <interface type='network'>
+          <mac address='52:54:00:{{ item.name | hash('md5') | truncate(2, True, '') }}:{{ item.name | hash('sha1') | truncate(2, True, '') }}:{{ item.ip | hash('md5') | truncate(2, True, '') }}'/>
           <source network='default'/>
           <model type='virtio'/>
         </interface>
-        <graphics type='vnc'/>
-        <serial type='pty'>
-          <target port='0'/>
-        </serial>
-        <console type='pty'>
-          <target type='serial' port='0'/>
-        </console>
+        <serial type='pty'/>
+        <console type='pty'/>
       </devices>
     </domain>
     EOF
@@ -160,6 +233,32 @@
   become: true
   loop: "{{ vms }}"
   ignore_errors: true  # In case VM is already running
+
+- name: Wait for VMs to boot
+  ansible.builtin.pause:
+    seconds: 30
+
+- name: Get VM IP addresses
+  ansible.builtin.shell: "virsh domifaddr {{ item.name }}"
+  register: vm_ips
+  loop: "{{ vms }}"
+  become: true
+
+- name: Display VM network info
+  ansible.builtin.debug:
+    var: vm_ips
+
+- name: Check cloud-init status
+  ansible.builtin.shell: |
+    virsh qemu-agent-command {{ item.name }} '{"execute":"guest-exec","arguments":{"path":"/usr/bin/cloud-init","arg":["status"]}}' || true
+  register: cloud_init_status
+  loop: "{{ vms }}"
+  become: true
+  ignore_errors: true
+
+- name: Display cloud-init status
+  ansible.builtin.debug:
+    var: cloud_init_status
 
 - name: Wait for VMs to be accessible
   wait_for:
