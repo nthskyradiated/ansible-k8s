@@ -129,56 +129,50 @@
   ignore_errors: true
   become: true
 
-- name: Create and start default network
+- name: Create and start k8s network
   block:
-    - name: Define default network
+    - name: Define k8s network
       ansible.builtin.shell: |
         virsh net-define /dev/stdin <<EOF
         <network>
-          <name>default</name>
-          <bridge name='virbr0'/>
+          <name>k8s-net</name>
+          <bridge name='k8sbr0'/>
           <forward mode='nat'/>
           <ip address='192.168.100.1' netmask='255.255.255.0'>
-            <dhcp>
-              <range start='192.168.100.128' end='192.168.100.254'/>
-            </dhcp>
           </ip>
         </network>
         EOF
       become: true
 
-    - name: Start default network
-      ansible.builtin.command: "virsh net-start default"
+    - name: Start k8s network
+      ansible.builtin.command: "virsh net-start k8s-net"
       become: true
 
-    - name: Enable autostart for default network
-      ansible.builtin.command: "virsh net-autostart default"
+    - name: Enable autostart for k8s network
+      ansible.builtin.command: "virsh net-autostart k8s-net"
       become: true
   rescue:
     - name: Cleanup and retry network setup
       block:
-        - name: Force destroy default network
+        - name: Force destroy k8s network
           ansible.builtin.shell: |
-            virsh net-destroy default || true
-            virsh net-undefine default || true
+            virsh net-destroy k8s-net || true
+            virsh net-undefine k8s-net || true
           become: true
         
         - name: Retry network creation
           ansible.builtin.shell: |
             virsh net-define /dev/stdin <<EOF
             <network>
-              <name>default</name>
-              <bridge name='virbr0'/>
+              <name>k8s-net</name>
+              <bridge name='k8sbr0'/>
               <forward mode='nat'/>
               <ip address='192.168.100.1' netmask='255.255.255.0'>
-                <dhcp>
-                  <range start='192.168.100.128' end='192.168.100.254'/>
-                </dhcp>
               </ip>
             </network>
             EOF
-            virsh net-start default
-            virsh net-autostart default
+            virsh net-start k8s-net
+            virsh net-autostart k8s-net
           become: true
 
 - name: Get supported machine types
@@ -217,7 +211,7 @@
         </disk>
         <interface type='network'>
           <mac address='52:54:00:{{ item.name | hash('md5') | truncate(2, True, '') }}:{{ item.name | hash('sha1') | truncate(2, True, '') }}:{{ item.ip | hash('md5') | truncate(2, True, '') }}'/>
-          <source network='default'/>
+          <source network='k8s-net'/>
           <model type='virtio'/>
         </interface>
         <serial type='pty'/>
