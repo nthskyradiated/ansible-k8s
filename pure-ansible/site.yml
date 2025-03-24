@@ -1,12 +1,37 @@
 ---
 - hosts: localhost
-  connection: local
   vars:
     control_planes: 2
     worker_nodes: 2
+  pre_tasks:
+    - name: Generate inventory file
+      template:
+        src: templates/inventory.j2
+        dest: "{{ playbook_dir }}/inventory"
+
+    - name: Refresh inventory to ensure new hosts are available
+      meta: refresh_inventory
+      
   roles:
     - ../roles/libvirt_provision
 
-- hosts: all:!localhost
+- hosts: k8s_cluster
+  gather_facts: no
+  tasks:
+    - name: Wait for VMs to be reachable
+      wait_for:
+        host: "{{ ansible_host }}"
+        port: 22
+        delay: 30
+        timeout: 300
+      delegate_to: localhost
+
+    - name: Wait for cloud-init to complete
+      raw: cloud-init status --wait
+      register: cloud_init_wait
+      retries: 30
+      delay: 10
+      until: cloud_init_wait.rc == 0
+
   roles:
     - ../roles/kubernetes

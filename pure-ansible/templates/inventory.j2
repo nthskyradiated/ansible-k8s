@@ -1,0 +1,23 @@
+[controlplanes]
+{% for i in range(1, control_planes|int + 1) %}
+controlplane{{ '%02d' | format(i) }} ansible_host=192.168.100.{{ 210 + i }}
+{% endfor %}
+
+[workernodes]
+{% for i in range(1, worker_nodes|int + 1) %}
+node{{ '%02d' | format(i) }} ansible_host=192.168.100.{{ 220 + i }}
+{% endfor %}
+
+[loadbalancers]
+loadbalancer ansible_host=192.168.100.200
+
+[k8s_cluster:children]
+controlplanes
+workernodes
+loadbalancers
+
+[k8s_cluster:vars]
+ansible_connection=ssh
+ansible_user=andy
+ansible_password=x
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
