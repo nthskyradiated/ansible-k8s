@@ -1,24 +1,15 @@
 #cloud-config
-hostname: {{ item[1].name }}
-fqdn: {{ item[1].name }}.local
-
+ssh_pwauth: true
+chpasswd:
+  expire: false
+groups:
+  - sudo
 users:
-  - default
-  - name: vagrant
-    sudo: ALL=(ALL) NOPASSWD:ALL
+  - name: {{ vm_username }}
+    groups: sudo
     shell: /bin/bash
     lock_passwd: false
-    plain_text_passwd: vagrant
-    ssh_authorized_keys:
-      - ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA6NF8iallvQVp22WDkTkyrtvp9eWW6A8YVr+kz4TjGYe7gHzIw+niNltGEFHzD8+v1I2YJ6oXevct1YeS0o9HZyN1Q9qgCgzUFtdOKLv6IedplqoPkcmF0aYet2PkEDo3MlTBckFXPITAMzF8dJSIFo9D8HfdOV0IAdx4O7PtixWKn5y2hMNG0zQPyUecp4pzC6kivAIhyfHilFR61RGL+GPXQ2MWZWFYbAGjyiYJnAmCP3NOTd0jMZEnDkbUvxhMmBYSdETk1rRgm+R4LOzFUGaHqHDLKLX+FIPKcF96hrucXzcWyLbIbEgE98OHlnVYCzRdK8jlqm8tehUc9c9WhQ== vagrant insecure public key
-
-ssh_pwauth: true
-disable_root: false
-
-package_update: true
-packages:
-  - openssh-server
-
+    plain_text_passwd: {{ vm_password }}
 write_files:
   - path: /etc/netplan/01-netcfg.yaml
     permissions: '0644'
@@ -31,9 +22,11 @@ write_files:
             gateway4: 192.168.100.1
             nameservers:
               addresses: [8.8.8.8]
-
+  - path: /etc/ssh/sshd_config.d/99-cloud-init.conf
+    content: |
+      PasswordAuthentication yes
+      PermitRootLogin no
 runcmd:
   - netplan generate
   - netplan apply
-  - systemctl enable ssh
-  - systemctl start ssh
+  - systemctl restart ssh

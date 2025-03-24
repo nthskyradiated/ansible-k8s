@@ -1,0 +1,152 @@
+- name: Download Ubuntu cloud image
+  get_url:
+    url: "{{ ubuntu_image_url }}"
+    dest: "{{ ubuntu_image_path }}"
+    mode: '0644'
+  become: true
+
+- name: Create cloud-init config directory
+  file:
+    path: "/var/lib/libvirt/images/{{ item[1].name }}"
+    state: directory
+  with_nested:
+    - ["meta-data", "user-data", "network-config"]
+    - "{{ vms }}"
+  become: true
+
+- name: Create cloud-init metadata
+  copy:
+    dest: "/var/lib/libvirt/images/{{ item[1].name }}/meta-data"
+    content: |
+      instance-id: {{ item[1].name }}
+      local-hostname: {{ item[1].name }}
+  with_nested:
+    - ["meta-data"]
+    - "{{ vms }}"
+  become: true
+
+- name: Create cloud-init user-data
+  copy:
+    dest: "/var/lib/libvirt/images/{{ item[1].name }}/user-data"
+    content: |
+      #cloud-config
+      ssh_pwauth: true
+      chpasswd:
+        expire: false
+      groups:
+        - sudo
+      users:
+        - name: {{ vm_username }}
+          groups: sudo
+          shell: /bin/bash
+          lock_passwd: false
+          plain_text_passwd: {{ vm_password }}
+      write_files:
+        - path: /etc/ssh/sshd_config.d/99-cloud-init.conf
+          content: |
+            PasswordAuthentication yes
+            PermitRootLogin no
+      runcmd:
+        - systemctl restart ssh
+  with_nested:
+    - ["user-data"]
+    - "{{ vms }}"
+  become: true
+
+- name: Create cloud-init network config
+  copy:
+    dest: "/var/lib/libvirt/images/{{ item[1].name }}/network-config"
+    content: |
+      version: 2
+      ethernets:
+        ens3:
+          addresses: [{{ item[1].ip }}/24]
+          routes:
+            - to: default
+              via: 192.168.100.1
+          nameservers:
+            addresses: [8.8.8.8]
+  with_nested:
+    - ["network-config"]
+    - "{{ vms }}"
+  become: true
+
+- name: Create cloud-init ISO
+  shell: |
+    genisoimage -output /var/lib/libvirt/images/{{ item[1].name }}/cloud-init.iso \
+    -volid cidata -joliet -rock \
+    /var/lib/libvirt/images/{{ item[1].name }}/user-data \
+    /var/lib/libvirt/images/{{ item[1].name }}/meta-data \
+    /var/lib/libvirt/images/{{ item[1].name }}/network-config
+  with_nested:
+    - ["iso"]
+    - "{{ vms }}"
+  become: true
+
+- name: Create VM disk
+  shell: |
+    qemu-img create -f qcow2 -F qcow2 -b {{ ubuntu_image_path }} \
+    /var/lib/libvirt/images/{{ item[1].name }}.qcow2 {{ item[1].disk_size }}G
+  with_nested:
+    - ["disk"]
+    - "{{ vms }}"
+  become: true
+
+- name: Define VM
+  virt:
+    name: "{{ item[1].name }}"
+    command: define
+    xml: |
+      <domain type='kvm'>
+        <name>{{ item[1].name }}</name>
+        <memory unit='MiB'>{{ item[1].memory }}</memory>
+        <vcpu>{{ item[1].vcpus }}</vcpu>
+        <os>
+          <type arch='x86_64'>hvm</type>
+          <boot dev='hd'/>
+        </os>
+        <features>
+          <acpi/>
+          <apic/>
+        </features>
+        <devices>
+          <disk type='file' device='disk'>
+            <driver name='qemu' type='qcow2'/>
+            <source file='/var/lib/libvirt/images/{{ item[1].name }}.qcow2'/>
+            <target dev='vda' bus='virtio'/>
+          </disk>
+          <disk type='file' device='cdrom'>
+            <driver name='qemu' type='raw'/>
+            <source file='/var/lib/libvirt/images/{{ item[1].name }}/cloud-init.iso'/>
+            <target dev='hdc' bus='ide'/>
+            <readonly/>
+          </disk>
+          <interface type='bridge'>
+            <source bridge='k8sbr0'/>
+            <model type='virtio'/>
+          </interface>
+          <serial type='pty'>
+            <target port='0'/>
+          </serial>
+          <console type='pty'>
+            <target type='serial' port='0'/>
+          </console>
+          <channel type='unix'>
+            <target type='virtio' name='org.qemu.guest_agent.0'/>
+          </channel>
+          <graphics type='vnc' port='-1' autoport='yes' listen='0.0.0.0'/>
+        </devices>
+      </domain>
+  with_nested:
+    - ["define"]
+    - "{{ vms }}"
+  become: true
+
+- name: Start VM
+  virt:
+    name: "{{ item[1].name }}"
+    state: running
+  with_nested:
+    - ["start"]
+    - "{{ vms }}"
+  become: true
