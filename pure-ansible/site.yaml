@@ -1,17 +1,21 @@
----
 - hosts: localhost
   vars:
     control_planes: 2
     worker_nodes: 2
   pre_tasks:
+    - name: Generate SSH key for guest access
+      ansible.builtin.openssh_keypair:
+        path: "{{ playbook_dir }}/ansible_key"
+        type: rsa
+        size: 2048
+        owner: "{{ vm_username }}"
+        mode: '0600'
     - name: Generate inventory file
-      template:
+      ansible.builtin.template:
         src: templates/inventory.j2
         dest: "{{ playbook_dir }}/inventory"
-
     - name: Refresh inventory to ensure new hosts are available
-      meta: refresh_inventory
-      
+      ansible.builtin.meta: refresh_inventory
   roles:
     - ../roles/libvirt_provision
 
@@ -19,19 +23,17 @@
   gather_facts: no
   tasks:
     - name: Wait for VMs to be reachable
-      wait_for:
+      ansible.builtin.wait_for:
         host: "{{ ansible_host }}"
         port: 22
         delay: 30
         timeout: 300
       delegate_to: localhost
-
     - name: Wait for cloud-init to complete
-      raw: cloud-init status --wait
+      ansible.builtin.raw: cloud-init status --wait
       register: cloud_init_wait
       retries: 30
       delay: 10
       until: cloud_init_wait.rc == 0
-
   roles:
     - ../roles/kubernetes

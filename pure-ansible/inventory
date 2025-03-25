@@ -1,12 +1,10 @@
 [controlplanes]
-{% for i in range(1, control_planes|int + 1) %}
-controlplane{{ '%02d' | format(i) }} ansible_host=192.168.100.{{ 210 + i }}
-{% endfor %}
+controlplane01 ansible_host=192.168.100.211
+controlplane02 ansible_host=192.168.100.212
 
 [workernodes]
-{% for i in range(1, worker_nodes|int + 1) %}
-node{{ '%02d' | format(i) }} ansible_host=192.168.100.{{ 220 + i }}
-{% endfor %}
+node01 ansible_host=192.168.100.221
+node02 ansible_host=192.168.100.222
 
 [loadbalancers]
 loadbalancer ansible_host=192.168.100.200
@@ -21,6 +19,6 @@ ansible_connection=ssh
 ansible_user=andy
 ansible_password=x
 ansible_ssh_common_args='-o StrictHostKeyChecking=no'
-ansible_ssh_private_key_file={{ playbook_dir }}/ansible_key
+ansible_ssh_private_key_file=/home/andy/Desktop/sandbox/ansible-k8s/pure-ansible/ansible_key
 ansible_become=true
 ansible_become_method=sudo

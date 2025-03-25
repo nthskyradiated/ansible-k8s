@@ -1,12 +1,12 @@
 - name: Download Ubuntu cloud image
-  get_url:
+  ansible.builtin.get_url:
     url: "{{ ubuntu_image_url }}"
     dest: "{{ ubuntu_image_path }}"
     mode: '0644'
   become: true
 
 - name: Create cloud-init config directory
-  file:
+  ansible.builtin.file:
     path: "/var/lib/libvirt/images/{{ item[1].name }}"
     state: directory
   with_nested:
@@ -15,7 +15,7 @@
   become: true
 
 - name: Create cloud-init metadata
-  copy:
+  ansible.builtin.copy:
     dest: "/var/lib/libvirt/images/{{ item[1].name }}/meta-data"
     content: |
       instance-id: {{ item[1].name }}
@@ -26,7 +26,7 @@
   become: true
 
 - name: Create cloud-init user-data
-  copy:
+  ansible.builtin.copy:
     dest: "/var/lib/libvirt/images/{{ item[1].name }}/user-data"
     content: |
       #cloud-config
@@ -54,7 +54,7 @@
   become: true
 
 - name: Create cloud-init network config
-  copy:
+  ansible.builtin.copy:
     dest: "/var/lib/libvirt/images/{{ item[1].name }}/network-config"
     content: |
       version: 2
@@ -72,7 +72,7 @@
   become: true
 
 - name: Create cloud-init ISO
-  shell: |
+  ansible.builtin.shell: |
     genisoimage -output /var/lib/libvirt/images/{{ item[1].name }}/cloud-init.iso \
     -volid cidata -joliet -rock \
     /var/lib/libvirt/images/{{ item[1].name }}/user-data \
@@ -84,7 +84,7 @@
   become: true
 
 - name: Create VM disk
-  shell: |
+  ansible.builtin.shell: |
     qemu-img create -f qcow2 -F qcow2 -b {{ ubuntu_image_path }} \
     /var/lib/libvirt/images/{{ item[1].name }}.qcow2 {{ item[1].disk_size }}G
   with_nested:
@@ -93,7 +93,7 @@
   become: true
 
 - name: Define VM
-  virt:
+  ansible.builtin.virt:
     name: "{{ item[1].name }}"
     command: define
     xml: |
@@ -143,10 +143,26 @@
   become: true
 
 - name: Start VM
-  virt:
+  ansible.builtin.virt:
     name: "{{ item[1].name }}"
     state: running
   with_nested:
     - ["start"]
     - "{{ vms }}"
   become: true
+
+# - name: Wait until SSH is available on guest VMs
+#   ansible.builtin.wait_for:
+#     port: 22
+#     delay: 10
+#     timeout: 300
+#   delegate_to: "{{ item }}"
+#   loop: "{{ groups['k8s_cluster'] }}"
+
+- name: Copy SSH public key to guest VMs for ansible access
+  ansible.builtin.authorized_key:
+    user: andy
+    state: present
+    key: "{{ lookup('file', playbook_dir + '/ansible_key.pub') }}"
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['k8s_cluster'] }}"
