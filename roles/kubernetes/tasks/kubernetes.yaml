@@ -109,15 +109,15 @@
 - name: Save kubeadm init output to a file
   ansible.builtin.copy:
     content: "{{ kubeadm_result.stdout }}"
-    dest: "/home/vagrant/kubeadm-init-output.txt"
+    dest: "{{ lookup('env', 'HOME') }}/kubeadm-init-output.txt"  # dynamic home path
   when: inventory_hostname == 'controlplane01'
 
 - name: Ensure .kube directory exists on controlplane01
   ansible.builtin.file:
-    path: /home/vagrant/.kube
+    path: "{{ ansible_env.HOME }}/.kube"  # dynamic remote home dir
     state: directory
-    owner: vagrant
-    group: vagrant
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
     mode: '0755'
   when: inventory_hostname == 'controlplane01'
   become: true
@@ -125,10 +125,10 @@
 - name: Copy kubeconfig
   ansible.builtin.copy:
     src: /etc/kubernetes/admin.conf
-    dest: /home/vagrant/.kube/config
+    dest: "{{ ansible_env.HOME }}/.kube/config"  # dynamic remote home dir
     remote_src: true
-    owner: vagrant
-    group: vagrant
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
     mode: '0600'
   when: inventory_hostname == 'controlplane01'
   become: true
@@ -156,20 +156,20 @@
 #   become_user: andy
 
 - name: Export kubeconfig to temporary location
-  ansible.builtin.fetch:
-    src: /home/vagrant/.kube/config
-    dest: "/tmp/k8s-config-{{ ansible_date_time.epoch }}"
-    flat: true
+  ansible.builtin.copy:
+    src: "{{ lookup('env','HOME') }}/.kube/config"  # dynamically uses the HOME of the current user on controlplane01
+    dest: "/tmp/kubeconfig"
   when: inventory_hostname == 'controlplane01'
   become: true
   register: temp_kubeconfig
 
-- name: Move kubeconfig to final location
-  ansible.builtin.command: "mv {{ temp_kubeconfig.dest }} /home/andy/.kube/config"
-  delegate_to: localhost
-  when: inventory_hostname == 'controlplane01' and temp_kubeconfig is defined
+- name: Fetch kubeconfig to final location on Ansible host
+  ansible.builtin.fetch:
+    src: "/tmp/kubeconfig"
+    dest: "{{ lookup('env','HOME') }}/.kube/config"
+    flat: true
+  when: inventory_hostname == 'controlplane01'
   become: true
-  become_user: andy
 
 - name: Set correct ownership and permissions on kubeconfig
   ansible.builtin.file:

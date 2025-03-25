@@ -151,13 +151,14 @@
     - "{{ vms }}"
   become: true
 
-# - name: Wait until SSH is available on guest VMs
-#   ansible.builtin.wait_for:
-#     port: 22
-#     delay: 10
-#     timeout: 300
-#   delegate_to: "{{ item }}"
-#   loop: "{{ groups['k8s_cluster'] }}"
+- name: Wait until SSH is available on guest VMs
+  ansible.builtin.wait_for:
+    host: "{{ hostvars[item].ansible_host }}"
+    port: 22
+    delay: 10
+    timeout: 90
+  delegate_to: localhost
+  loop: "{{ groups['k8s_cluster'] }}"
 
 - name: Copy SSH public key to guest VMs for ansible access
   ansible.builtin.authorized_key:
@@ -166,3 +167,10 @@
     key: "{{ lookup('file', playbook_dir + '/ansible_key.pub') }}"
   delegate_to: "{{ item }}"
   loop: "{{ groups['k8s_cluster'] }}"
+
+- name: Copy Cilium values file to controlplane01
+  ansible.builtin.copy:
+    src: "{{ playbook_dir | dirname }}/tools/ubuntu/cilium-values.yaml"
+    dest: "{{ ansible_env.HOME }}/cilium-values.yaml"  # dynamic remote home path
+  delegate_to: controlplane01
+  become: true

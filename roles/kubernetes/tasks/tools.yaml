@@ -83,7 +83,7 @@
       become: false
     - name: Install Cilium using Helm
       ansible.builtin.shell: |
-        helm install cilium cilium/cilium --version 1.18.0-pre.0 --namespace kube-system -f /home/vagrant/cilium-values.yaml
+        helm install cilium cilium/cilium --version 1.18.0-pre.0 --namespace kube-system -f /home/{{ ansible_user }}/cilium-values.yaml
       args:
         creates: /var/lib/kubernetes/.cilium_installed
       become: false
