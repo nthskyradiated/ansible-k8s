@@ -114,24 +114,26 @@
 
 - name: Ensure .kube directory exists on controlplane01
   ansible.builtin.file:
-    path: "{{ ansible_env.HOME }}/.kube"  # dynamic remote home dir
+    path: "/home/{{ ansible_user }}/.kube"
     state: directory
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'
   when: inventory_hostname == 'controlplane01'
   become: true
+  become_user: "{{ ansible_user }}"
 
 - name: Copy kubeconfig
   ansible.builtin.copy:
     src: /etc/kubernetes/admin.conf
-    dest: "{{ ansible_env.HOME }}/.kube/config"  # dynamic remote home dir
+    dest: "/home/{{ ansible_user }}/.kube/config"
     remote_src: true
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0600'
   when: inventory_hostname == 'controlplane01'
   become: true
+  # become_user: "{{ ansible_user }}"
   changed_when: false
 
 - name: Ensure .kube directory exists on Ansible host
@@ -157,10 +159,11 @@
 
 - name: Export kubeconfig to temporary location
   ansible.builtin.copy:
-    src: "{{ lookup('env','HOME') }}/.kube/config"  # dynamically uses the HOME of the current user on controlplane01
+    src: "/home/{{ ansible_user }}/.kube/config"
     dest: "/tmp/kubeconfig"
   when: inventory_hostname == 'controlplane01'
   become: true
+  become_user: "{{ ansible_user }}"
   register: temp_kubeconfig
 
 - name: Fetch kubeconfig to final location on Ansible host
@@ -168,14 +171,15 @@
     src: "/tmp/kubeconfig"
     dest: "{{ lookup('env','HOME') }}/.kube/config"
     flat: true
+    force: yes
   when: inventory_hostname == 'controlplane01'
   become: true
 
 - name: Set correct ownership and permissions on kubeconfig
   ansible.builtin.file:
-    path: /home/andy/.kube/config
-    owner: andy
-    group: andy
+    path: "{{ lookup('env','HOME') }}/.kube/config"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
     mode: '0600'
   delegate_to: localhost
   when: inventory_hostname == 'controlplane01'
