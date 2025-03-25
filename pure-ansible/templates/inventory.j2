@@ -8,13 +8,17 @@ controlplane{{ '%02d' | format(i) }} ansible_host=192.168.100.{{ 210 + i }}
 node{{ '%02d' | format(i) }} ansible_host=192.168.100.{{ 220 + i }}
 {% endfor %}
 
+{% if control_planes|int > 1 %}
 [loadbalancers]
 loadbalancer ansible_host=192.168.100.200
+{% endif %}
 
 [k8s_cluster:children]
 controlplanes
 workernodes
+{% if control_planes|int > 1 %}
 loadbalancers
+{% endif %}
 
 [k8s_cluster:vars]
 ansible_connection=ssh

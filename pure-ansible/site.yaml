@@ -1,6 +1,6 @@
 - hosts: localhost
   vars:
-    control_planes: 2
+    control_planes: 1
     worker_nodes: 2
   pre_tasks:
     - name: Generate SSH key for guest access
