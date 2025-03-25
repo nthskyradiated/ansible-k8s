@@ -16,3 +16,7 @@ The playbook will:
 1. Create required VMs using libvirt
 2. Configure networking and user access
 3. Provision kubernetes cluster
+
+@todo:
+ - Create a dynamic inventory
+ - inject hostnames to guests' /etc/hosts

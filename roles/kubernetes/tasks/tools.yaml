@@ -86,6 +86,6 @@
         helm install cilium cilium/cilium --version 1.18.0-pre.0 --namespace kube-system -f cilium-values.yaml
       args:
         creates: /var/lib/kubernetes/.cilium_installed
-      environment:
-        KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
+      environment: 
+        KUBECONFIG: "/home/{{ lookup('env','USER') }}/.kube/config"
       become: false
