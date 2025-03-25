@@ -57,7 +57,7 @@ def provision_kubernetes_node(node)
 end
 
 
-NUM_CONTROL_NODES = 2
+NUM_CONTROL_NODES = 1
 NUM_WORKER_NODE = 2
 MASTER_IP_START = 210
 NODE_IP_START = 220
@@ -110,7 +110,7 @@ config.vm.box_version = "202502.21.0"
       node.vm.network :private_network,
         :ip => "#{IP_NW}#{MASTER_IP_START + i}",
         :type => "static",
-        :libvirt__network_name => "default",
+        :libvirt__network_name => "k8s-net",
         :libvirt__forward_mode => "nat",
         :libvirt__guest_ipv6 => "no"
       setup_dns(node)
@@ -133,7 +133,7 @@ config.vm.box_version = "202502.21.0"
       node.vm.network :private_network,
         :ip => "#{IP_NW}#{LB_IP_START}",
         :type => "static",
-        :libvirt__network_name => "default",
+        :libvirt__network_name => "k8s-net",
         :libvirt__forward_mode => "nat",
         :libvirt__guest_ipv6 => "no"
       setup_dns(node)
@@ -154,7 +154,7 @@ config.vm.box_version = "202502.21.0"
       node.vm.network :private_network,
         :ip => "#{IP_NW}#{NODE_IP_START + i}",
         :type => "static",
-        :libvirt__network_name => "default",
+        :libvirt__network_name => "k8s-net",
         :libvirt__forward_mode => "nat",
         :libvirt__guest_ipv6 => "no"
       setup_dns(node)
