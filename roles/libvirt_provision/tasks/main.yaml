@@ -182,3 +182,15 @@
     dest: "{{ ansible_env.HOME }}/cilium-values.yaml"  # dynamic remote home path
   delegate_to: controlplane01
   become: true
+
+- name: Inject hostnames and IP addresses into /etc/hosts on guest VMs
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} ANSIBLE MANAGED HOSTS INVENTORY"
+    block: |
+      {% for host in groups['k8s_cluster'] %}
+      {{ hostvars[host].ansible_host }} {{ hostvars[host].inventory_hostname }}
+      {% endfor %}
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ groups['k8s_cluster'] }}"
