@@ -87,5 +87,5 @@
       args:
         creates: /var/lib/kubernetes/.cilium_installed
       environment: 
-        KUBECONFIG: "/home/{{ lookup('env','USER') }}/.kube/config"
+        KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
       become: false
