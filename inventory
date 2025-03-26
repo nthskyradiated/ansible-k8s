@@ -1,0 +1,6 @@
+[controlplanes]
+controlplane01 ansible_host=192.168.100.211
+
+[workernodes]
+node01 ansible_host=192.168.100.221
+node02 ansible_host=192.168.100.222
