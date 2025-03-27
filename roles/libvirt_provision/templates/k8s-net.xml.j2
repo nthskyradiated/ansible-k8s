@@ -1,7 +1,7 @@
 <network>
   <name>k8s-net</name>
   <forward mode='nat'/>
-  <bridge name='k8sbr0' stp='on' delay='0'/>
+  <bridge name='virbr1' stp='on' delay='0'/>
   <mac address='52:54:00:bb:3a:34'/>
   <domain name='k8s.local'/>
   <ip address='192.168.100.1' netmask='255.255.255.0'>

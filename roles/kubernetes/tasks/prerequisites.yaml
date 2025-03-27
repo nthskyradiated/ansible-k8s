@@ -1,4 +1,15 @@
 ---
+# Add host injection at the start
+- name: Inject hostnames and IP addresses into /etc/hosts
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} ANSIBLE MANAGED HOSTS INVENTORY"
+    block: |
+      {% for host in groups['k8s_cluster'] %}
+      {{ hostvars[host].ansible_host }} {{ hostvars[host].inventory_hostname }}
+      {% endfor %}
+  become: true
+
 - name: Remove invalid IP line from /etc/environment
   become: true
   ansible.builtin.lineinfile:

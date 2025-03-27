@@ -4,7 +4,7 @@ vm_username: "andy"
 vm_password: "x"
 
 # Cluster configuration
-control_planes: 3
+control_planes: 1
 worker_nodes: 3
 
 # Resource configuration

@@ -34,5 +34,14 @@ inventory << "[workernodes]\n"
   inventory << format("node%02d ansible_host=192.168.100.%d\n", i, constants["NODE_IP_START"] + i)
 end
 
+inventory << "\n"
+# Add k8s_cluster group
+inventory << "[k8s_cluster:children]\n"
+inventory << "controlplanes\n"
+inventory << "workernodes\n"
+if constants["NUM_CONTROL_NODES"] >= 2
+  inventory << "loadbalancers\n"
+end
+
 File.write(inventory_path, inventory)
 puts "Dynamic inventory updated at #{inventory_path}"
