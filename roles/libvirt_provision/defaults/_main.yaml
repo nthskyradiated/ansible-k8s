@@ -1,4 +1,3 @@
----
 vm_username: "andy"
 vm_password: "x"
 ubuntu_image_url: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img"
@@ -17,18 +16,6 @@ vms:
     disk_size: 20
     os_variant: ubuntu24.04
     ip: 192.168.100.212
-  - name: controlplane03
-    memory: 4096
-    vcpus: 2
-    disk_size: 20
-    os_variant: ubuntu24.04
-    ip: 192.168.100.213
-  - name: loadbalancer
-    memory: 2048
-    vcpus: 1
-    disk_size: 20
-    os_variant: ubuntu24.04
-    ip: 192.168.100.200
   - name: node01
     memory: 4096
     vcpus: 2
@@ -41,9 +28,9 @@ vms:
     disk_size: 20
     os_variant: ubuntu24.04
     ip: 192.168.100.222
-  - name: node03
-    memory: 4096
-    vcpus: 2
+  - name: loadbalancer
+    memory: 2048
+    vcpus: 1
     disk_size: 20
     os_variant: ubuntu24.04
-    ip: 192.168.100.223
+    ip: 192.168.100.200

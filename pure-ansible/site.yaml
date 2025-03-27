@@ -1,8 +1,9 @@
 - hosts: localhost
-  vars:
-    control_planes: 1
-    worker_nodes: 2
   pre_tasks:
+    - name: Load default variables
+      include_vars: group_vars/all.yaml
+    - name: Generate dynamic defaults
+      import_tasks: ./tasks/generate_defaults.yaml
     - name: Generate SSH key for guest access
       ansible.builtin.openssh_keypair:
         path: "{{ playbook_dir }}/ansible_key"
@@ -20,20 +21,5 @@
     - ../roles/libvirt_provision
 
 - hosts: k8s_cluster
-  # gather_facts: no
-  # tasks:
-  #   - name: Wait for VMs to be reachable
-  #     ansible.builtin.wait_for:
-  #       host: "{{ ansible_host }}"
-  #       port: 22
-  #       delay: 30
-  #       timeout: 300
-  #     delegate_to: localhost
-  #   - name: Wait for cloud-init to complete
-  #     ansible.builtin.raw: cloud-init status --wait
-  #     register: cloud_init_wait
-  #     retries: 30
-  #     delay: 10
-  #     until: cloud_init_wait.rc == 0
   roles:
     - ../roles/kubernetes

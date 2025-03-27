@@ -1,0 +1,55 @@
+---
+- name: Create defaults directory
+  file:
+    path: "{{ playbook_dir }}/../roles/libvirt_provision/defaults"
+    state: directory
+    mode: '0755'
+
+- name: Generate VM list
+  set_fact:
+    vm_list: []
+    temp_vms: |
+      {% for i in range(1, (control_planes | int) + 1) %}
+      - name: controlplane{{ '%02d' | format(i) }}
+        memory: {{ control_plane_memory | default(4096) }}
+        vcpus: {{ 2 if ansible_processor_vcpus >= 12 else 1 }}
+        disk_size: {{ vm_disk_size | default(20) }}
+        os_variant: ubuntu24.04
+        ip: 192.168.100.{{ 210 + i }}
+      {% endfor %}
+      {% if control_planes | int > 1 %}
+      - name: loadbalancer
+        memory: {{ loadbalancer_memory | default(2048) }}
+        vcpus: 1
+        disk_size: {{ vm_disk_size | default(20) }}
+        os_variant: ubuntu24.04
+        ip: 192.168.100.200
+      {% endif %}
+      {% for i in range(1, (worker_nodes | int) + 1) %}
+      - name: node{{ '%02d' | format(i) }}
+        memory: {{ worker_node_memory | default(4096) }}
+        vcpus: {{ worker_node_vcpus | default(2) }}
+        disk_size: {{ vm_disk_size | default(20) }}
+        os_variant: ubuntu24.04
+        ip: 192.168.100.{{ 220 + i }}
+      {% endfor %}
+
+- name: Parse VM list
+  set_fact:
+    vm_list: "{{ (vm_list + [item]) | from_yaml }}"
+  with_items: "{{ temp_vms.split('\n') }}"
+  when: item | trim != ""
+
+- name: Update defaults file
+  copy:
+    dest: "{{ playbook_dir }}/../roles/libvirt_provision/defaults/main.yaml"
+    mode: '0644'  # Add mode to ensure file is readable
+    content: |
+      ---
+      vm_username: "{{ vm_username | default('andy') }}"
+      vm_password: "{{ vm_password | default('x') }}"
+      ubuntu_image_url: "{{ ubuntu_image_url | default('https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img') }}"
+      ubuntu_image_path: "{{ ubuntu_image_path | default('/var/lib/libvirt/images/ubuntu-24.04-server-cloudimg-amd64.img') }}"
+
+      vms:
+      {{ temp_vms | indent(2, true) }}
