@@ -43,7 +43,7 @@
 - name: Update defaults file
   ansible.builtin.copy:
     dest: "{{ playbook_dir }}/../roles/libvirt_provision/defaults/main.yaml"
-    mode: '0644'  # Add mode to ensure file is readable
+    mode: '0644'
     content: |
       ---
       vm_username: "{{ vm_username | default('andy') }}"
