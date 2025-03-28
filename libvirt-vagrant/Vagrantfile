@@ -19,9 +19,6 @@ RESOURCES = {
 }
 
 def setup_dns(node)
-  # node.vm.provision "setup-hosts", type: "shell", path: "../tools/ubuntu/vagrant/setup-hosts.sh" do |s|
-  #   s.args = ["eth0", node.vm.hostname, "#{IP_NW}"]
-  # end
   node.vm.provision "setup-dns", type: "shell", path: "../tools/ubuntu/update-dns.sh"
 end
 
@@ -63,7 +60,6 @@ MASTER_IP_START = 210
 NODE_IP_START = 220
 LB_IP_START = 200
 
-# Common Libvirt configurations
 LIBVIRT_DEFAULTS = {
   :driver => "kvm",
   :cpu_mode => "host-passthrough",

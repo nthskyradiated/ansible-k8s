@@ -108,7 +108,6 @@ else
     echo "Aliases already exist in $BASHRC. Skipping addition."
 fi
 
-# Reload .bashrc to apply changes
 echo_step "Reloading $BASHRC..."
 source "$BASHRC"
 echo_success "Script execution completed!"

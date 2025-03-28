@@ -28,9 +28,6 @@ RESOURCES = {
 }
 
 def setup_dns(node)
-  # node.vm.provision "setup-hosts", type: "shell", path: "../tools/ubuntu/vagrant/setup-hosts.sh" do |s|
-  #   s.args = ["eth0", node.vm.hostname, "#{IP_NW}"]
-  # end
   node.vm.provision "setup-dns", type: "shell", path: "../tools/ubuntu/update-dns.sh"
 end
 
@@ -89,14 +86,6 @@ Vagrant.configure("2") do |config|
   config.trigger.before :up do |trigger|
     trigger.run = { inline: "ruby ../tools/generate_inventory_hpv.rb" }
   end
-
-  # config.trigger.after :provision do |trigger|
-  #   trigger.info = "Running ansible-playbook.sh after provision..."
-  #   trigger.run = {
-  #   inline: "bash ./ansible-playbook.sh"
-  #   }
-  #   trigger.only_on = "node02"
-  # end
 
   config.vm.box = "sture/ubuntu2404"
   config.vm.box_version = "2024.12.04.10"
