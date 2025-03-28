@@ -1,6 +1,6 @@
 ---
 - name: Wait for APT locks
-  shell: |
+  ansible.builtin.shell: |
     while lsof /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || lsof /var/lib/apt/lists/lock >/dev/null 2>&1 || lsof /var/lib/dpkg/lock >/dev/null 2>&1; do
       echo "Waiting for other APT processes to finish..."
       sleep 5

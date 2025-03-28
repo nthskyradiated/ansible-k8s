@@ -1,9 +1,9 @@
 - hosts: localhost
   pre_tasks:
     - name: Load default variables
-      include_vars: group_vars/all.yaml
+      ansible.builtin.include_vars: group_vars/all.yaml
     - name: Generate dynamic defaults
-      import_tasks: ./tasks/generate_defaults.yaml
+      ansible.builtin.import_tasks: ./tasks/generate_defaults.yaml
     - name: Generate SSH key for guest access
       ansible.builtin.openssh_keypair:
         path: "{{ playbook_dir }}/ansible_key"

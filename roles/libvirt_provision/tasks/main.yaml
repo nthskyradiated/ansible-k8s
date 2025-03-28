@@ -1,9 +1,9 @@
 - name: Include role defaults
-  include_vars:
+  ansible.builtin.include_vars:
     file: "{{ role_path }}/defaults/main.yaml"
 
 - name: Check k8s-net network status
-  command: virsh net-info k8s-net
+  ansible.builtin.command: virsh net-info k8s-net
   register: net_exists
   ignore_errors: true
   become: true
@@ -11,31 +11,31 @@
 - name: Handle k8s-net network setup
   block:    
     - name: Define network from template
-      template:
+      ansible.builtin.template:
         src: k8s-net.xml.j2
         dest: /tmp/k8s-net.xml
       
     - name: Undefine existing network if exists
-      command: virsh net-undefine k8s-net
+      ansible.builtin.command: virsh net-undefine k8s-net
       ignore_errors: true
       
     - name: Define network in libvirt
-      command: virsh net-define /tmp/k8s-net.xml
+      ansible.builtin.command: virsh net-define /tmp/k8s-net.xml
   when: net_exists.rc != 0
   become: true
 
 - name: Ensure network is started
-  command: virsh net-start k8s-net
+  ansible.builtin.command: virsh net-start k8s-net
   ignore_errors: true
   become: true
 
 - name: Set network to autostart
-  command: virsh net-autostart k8s-net
+  ansible.builtin.command: virsh net-autostart k8s-net
   ignore_errors: true
   become: true
 
 - name: Wait for bridge interface
-  wait_for:
+  ansible.builtin.wait_for:
     timeout: 5
   when: net_exists.rc != 0
 

@@ -1,12 +1,12 @@
 ---
 - name: Create defaults directory
-  file:
+  ansible.builtin.file:
     path: "{{ playbook_dir }}/../roles/libvirt_provision/defaults"
     state: directory
     mode: '0755'
 
 - name: Generate VM list
-  set_fact:
+  ansible.builtin.set_fact:
     vm_list: []
     temp_vms: |
       {% for i in range(1, (control_planes | int) + 1) %}
@@ -35,13 +35,13 @@
       {% endfor %}
 
 - name: Parse VM list
-  set_fact:
+  ansible.builtin.set_fact:
     vm_list: "{{ (vm_list + [item]) | from_yaml }}"
   with_items: "{{ temp_vms.split('\n') }}"
   when: item | trim != ""
 
 - name: Update defaults file
-  copy:
+  ansible.builtin.copy:
     dest: "{{ playbook_dir }}/../roles/libvirt_provision/defaults/main.yaml"
     mode: '0644'  # Add mode to ensure file is readable
     content: |
