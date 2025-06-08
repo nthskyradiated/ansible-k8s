@@ -195,7 +195,7 @@
 
 - name: Copy SSH public key to guest VMs for ansible access
   ansible.builtin.authorized_key:
-    user: andy
+    user: "{{ vm_username }}"
     state: present
     key: "{{ lookup('file', playbook_dir + '/ansible_key.pub') }}"
   delegate_to: "{{ item }}"

@@ -102,7 +102,7 @@
     jid: "{{ kubeadm_init_output.ansible_job_id }}"
   register: kubeadm_result
   until: kubeadm_result.finished
-  retries: 30
+  retries: 100
   delay: 10
   when: inventory_hostname == 'controlplane01'
 

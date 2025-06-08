@@ -19,7 +19,7 @@ git clone https://github.com/nthskyradiated/ansible-k8s
  - For HyperV, make sure that a bridge network has already been created to be used by the deployment.
 
  - Adjust the variables in the corresponding Vagrantfile (*RAM_SIZE, CPU_CORES, NUM_CONTROL_NODES, etc.*) 
- - For pure Ansible deployment, the variables are stored in `./pure-ansible/group_vars/all.yaml`.
+ - For pure Ansible deployment, the variables are stored in `./pure-ansible/group_vars/all.yaml`. Create the ssh keys needed and store them inside the `./pure-ansible` folder.
   
  - Just cd into one of the 3 folders and run command:
 ```bash
