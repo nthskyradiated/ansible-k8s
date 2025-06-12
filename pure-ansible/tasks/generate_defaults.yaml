@@ -46,8 +46,8 @@
     mode: '0644'
     content: |
       ---
-      vm_username: "{{ vm_username | default('andy') }}"
-      vm_password: "{{ vm_password | default('x') }}"
+      vm_username: "{{ vm_username | default('vagrant') }}"
+      vm_password: "{{ vm_password | default('vagrant') }}"
       ubuntu_image_url: "{{ ubuntu_image_url | default('https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img') }}"
       ubuntu_image_path: "{{ ubuntu_image_path | default('/var/lib/libvirt/images/ubuntu-24.04-server-cloudimg-amd64.img') }}"
 

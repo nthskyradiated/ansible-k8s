@@ -146,15 +146,6 @@
   become: false
   ignore_errors: true
 
-  
-# - name: Export kubeconfig to Ansible host
-#   ansible.builtin.fetch:
-#     src: /home/vagrant/.kube/config  # This is where the file was copied internally
-#     dest: /home/andy/.kube/config  # Local path on your Ansible machine
-#     flat: true
-#   when: inventory_hostname == 'controlplane01'
-#   become_user: andy
-
 - name: Export kubeconfig to temporary location
   ansible.builtin.fetch:
     src: /home/{{ ansible_user }}/.kube/config
