@@ -9,6 +9,7 @@
  - Make sure Ansible and Vagrant is installed.
  - Libvirt and Qemu should be installed if running on Linux.
  - Using Libvirt with Vagrant requires the Libvirt Vagrant provider to be installed. *Find the documentation here: https://vagrant-libvirt.github.io/vagrant-libvirt/installation.html*
+ - *There seems to be an issue with vagrant versions later than `2.4.5` for the HyperV provider, So I would recommend to sticking to `2.4.5` until the issue is resolved. reference: https://github.com/hashicorp/vagrant/issues/13676*
   
 ### Clone the repo
 ```bash
