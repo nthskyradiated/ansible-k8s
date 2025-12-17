@@ -2,17 +2,49 @@
 - name: Install additional tools on controlplane01
   when: inventory_hostname == 'controlplane01'
   block:
+    # 1. Install prerequisites FIRST
+    - name: Install curl and gpg prerequisites
+      ansible.builtin.apt:
+        name:
+          - curl
+          - wget
+          - gpg
+          - software-properties-common
+        state: present
+        update_cache: true
+      become: true
+
+    # 2. Helm repository setup (using updated URL from your research)
     - name: Add Helm repository key
       ansible.builtin.shell: |
-        curl -fsSL https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+        curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
       become: true
+      register: helm_key_result
+      ignore_errors: true
+
+    - name: Add Helm repository (using correct URL)
+      ansible.builtin.shell: |
+        echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list > /dev/null
+      become: true
+      when: helm_key_result is succeeded
+      ignore_errors: true
+
+    # 3. Terraform repository setup
     - name: Add HashiCorp repository key
       ansible.builtin.shell: |
         wget -q -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-    - name: Add Helm and HashiCorp repositories
+      become: true
+      register: hashicorp_key_result
+      ignore_errors: true
+
+    - name: Add HashiCorp repository
       ansible.builtin.shell: |
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list > /dev/null
         echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list > /dev/null
+      become: true
+      when: hashicorp_key_result is succeeded
+      ignore_errors: true
+
+    # 4. MAIN PACKAGE INSTALL (with retries)
     - name: Install additional packages
       ansible.builtin.apt:
         name:
@@ -21,7 +53,13 @@
           - jq
         state: present
         update_cache: true
+      become: true
+      register: apt_install_result
+      retries: 5
+      delay: 5
+      until: apt_install_result is succeeded
 
+# YOUR EXISTING CILIUM INSTALLATION BLOCK (unchanged)
 - name: Install Cilium CLI
   when: inventory_hostname == 'controlplane01'
   block:
@@ -37,7 +75,9 @@
         sha256sum --check cilium-linux-${CLI_ARCH}.tar.gz.sha256sum
         sudo tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
         rm -f cilium-linux-${CLI_ARCH}.tar.gz cilium-linux-${CLI_ARCH}.tar.gz.sha256sum
+      become: true
 
+# YOUR EXISTING HUBBLE INSTALLATION BLOCK (unchanged)
 - name: Install Hubble CLI
   when: inventory_hostname == 'controlplane01'
   block:
@@ -53,7 +93,9 @@
         sha256sum --check hubble-linux-${HUBBLE_ARCH}.tar.gz.sha256sum
         sudo tar xzvfC hubble-linux-${HUBBLE_ARCH}.tar.gz /usr/local/bin
         rm -f hubble-linux-${HUBBLE_ARCH}.tar.gz hubble-linux-${HUBBLE_ARCH}.tar.gz.sha256sum
+      become: true
 
+# YOUR EXISTING KUBESEAL INSTALLATION BLOCK (unchanged)
 - name: Install Kubeseal
   when: inventory_hostname == 'controlplane01'
   block:
@@ -71,7 +113,9 @@
         rm -f kubeseal-{{ kubeseal_version.stdout }}-linux-amd64.tar.gz kubeseal
       args:
         creates: /usr/local/bin/kubeseal
+      become: true
 
+# YOUR EXISTING CILIUM HELM CONFIGURATION BLOCK (unchanged)
 - name: Configure Cilium with Helm
   when: inventory_hostname == 'controlplane01'
   block:
@@ -81,6 +125,9 @@
         helm repo update
       changed_when: false
       become: false
+      environment:
+        KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
+      
     - name: Install Cilium using Helm
       ansible.builtin.shell: |
         helm install cilium cilium/cilium --version 1.18.0-pre.0 --namespace kube-system -f cilium-values.yaml

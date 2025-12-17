@@ -47,27 +47,38 @@
     - Start and enable kubelet
     - Reload systemd
 
+# Check if loadbalancer SSH port is open (only if loadbalancers group exists)
 - name: Check if loadbalancer SSH port is open
-  ansible.builtin.command: "nc -z -w3 {{ hostvars['loadbalancer']['ansible_host'] }} 22"
+  ansible.builtin.command: "nc -z -w3 {{ hostvars[groups['loadbalancers'][0]]['ansible_host'] }} 22"
   delegate_to: localhost
   register: lb_ssh_check
   ignore_errors: true
   run_once: true
   become: false
-  
+  when: "'loadbalancers' in groups and groups['loadbalancers'] | length > 0"
+
 - name: Set loadbalancer facts
   ansible.builtin.set_fact:
-    lb_available: "{{ groups['loadbalancers'] is defined and groups['loadbalancers'] | length > 0 and lb_ssh_check.rc == 0 }}"
+    lb_available: false
+  when: "'loadbalancers' not in groups or groups['loadbalancers'] | length == 0"
 
+- name: Set loadbalancer facts (when loadbalancer exists)
+  ansible.builtin.set_fact:
+    lb_available: "{{ lb_ssh_check.rc == 0 }}"
+  when: "'loadbalancers' in groups and groups['loadbalancers'] | length > 0"
+  run_once: true
+
+# Restart HAProxy only if loadbalancer is available
 - name: Ensure HAProxy is restarted before initializing Kubernetes
   ansible.builtin.systemd:
     name: haproxy
     state: restarted
-  delegate_to: "{{ groups['loadbalancers'][0] }}"
-  when: lb_available | bool and lb_ssh_check.rc == 0
+  delegate_to: "{{ groups['loadbalancers'][0] if 'loadbalancers' in groups and groups['loadbalancers'] | length > 0 else omit }}"
+  when: lb_available | bool
   become: true
   run_once: true
 
+# Check if loadbalancer is reachable
 - name: Check if loadbalancer is reachable
   ansible.builtin.ping:
   register: lb_ping
@@ -76,6 +87,7 @@
     - lb_available | bool
     - inventory_hostname == 'controlplane01'
   ignore_errors: true
+  delegate_to: "{{ groups['loadbalancers'][0] if 'loadbalancers' in groups and groups['loadbalancers'] | length > 0 else omit }}"
 
 - name: Reset kubeadm configuration
   ansible.builtin.shell: kubeadm reset -f
