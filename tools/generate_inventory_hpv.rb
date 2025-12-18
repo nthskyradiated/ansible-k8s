@@ -1,9 +1,7 @@
 #!/usr/bin/env ruby
 
-# Get project root directory (one level up from script location)
 ROOT_DIR = File.expand_path('..', File.dirname(__FILE__))
 
-# Read constants from Vagrantfile
 vagrantfile = File.join(ROOT_DIR, "hyperv-vagrant", "Vagrantfile")
 constants = {}
 File.readlines(vagrantfile).each do |line|
@@ -12,7 +10,6 @@ File.readlines(vagrantfile).each do |line|
   end
 end
 
-# Update inventory path to point to project root
 inventory_path = File.join(ROOT_DIR, "inventory")
 dir = File.dirname(inventory_path)
 Dir.mkdir(dir) unless Dir.exist?(dir)

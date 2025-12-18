@@ -130,7 +130,7 @@
       
     - name: Install Cilium using Helm
       ansible.builtin.shell: |
-        helm install cilium cilium/cilium --version 1.18.0-pre.0 --namespace kube-system -f cilium-values.yaml
+        helm install cilium cilium/cilium --version 1.19.0-pre.3 --namespace kube-system -f cilium-values.yaml
       args:
         creates: /var/lib/kubernetes/.cilium_installed
       environment: 

@@ -42,23 +42,23 @@
     proto: "{{ item.proto }}"
   loop:
     # Kubernetes core ports
-    - { port: "6443", proto: "tcp" }      # Kubernetes API server
-    - { port: "2379", proto: "tcp" }      # etcd client API
-    - { port: "2380", proto: "tcp" }      # etcd peer API
-    - { port: "10250", proto: "tcp" }     # Kubelet API
-    - { port: "10251", proto: "tcp" }     # kube-scheduler
-    - { port: "10252", proto: "tcp" }     # kube-controller-manager
-    - { port: "10255", proto: "tcp" }     # Read-only Kubelet API (optional)
-    - { port: "30000:32767", proto: "tcp" } # NodePort Services
+    - { port: "6443", proto: "tcp" }
+    - { port: "2379", proto: "tcp" }
+    - { port: "2380", proto: "tcp" }
+    - { port: "10250", proto: "tcp" }
+    - { port: "10251", proto: "tcp" }
+    - { port: "10252", proto: "tcp" }
+    - { port: "10255", proto: "tcp" }
+    - { port: "30000:32767", proto: "tcp" }
     # Cilium ports
-    - { port: "4240", proto: "tcp" }      # Cilium health
+    - { port: "4240", proto: "tcp" }
     - { port: "4240", proto: "udp" }
-    - { port: "4244", proto: "tcp" }      # Cilium agent API
-    - { port: "8472", proto: "udp" }      # VXLAN (if using overlay)
+    - { port: "4244", proto: "tcp" }
+    - { port: "8472", proto: "udp" }
     # Hubble ports
-    - { port: "4245", proto: "tcp" }      # Hubble relay
+    - { port: "4245", proto: "tcp" }
     - { port: "4245", proto: "udp" }
-    - { port: "4246", proto: "tcp" }      # Hubble UI/API
+    - { port: "4246", proto: "tcp" }
     - { port: "4246", proto: "udp" }
   become: true
 

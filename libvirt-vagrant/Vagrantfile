@@ -39,13 +39,6 @@ def setup_ssh(node)
   SHELL
 end
 
-# def install_sshpass(node)
-#   node.vm.provision "install-sshpass", type: "shell", inline: <<-SHELL
-#     sudo apt-get update -y
-#     sudo apt-get install -y sshpass
-#   SHELL
-# end
-
 def provision_kubernetes_node(node)
   node.vm.provision "setup-kernel", type: "shell", path: "../tools/ubuntu/setup-kernel.sh"
   setup_ssh(node)
@@ -71,7 +64,6 @@ LIBVIRT_DEFAULTS = {
 }
 
 Vagrant.configure("2") do |config|
-  # Generate inventory file before any VM provisioning
   config.trigger.before :up do |trigger|
     trigger.run = { inline: "ruby ../tools/generate_inventory.rb" }
   end
@@ -110,7 +102,6 @@ Vagrant.configure("2") do |config|
       setup_dns(node)
       provision_kubernetes_node(node)
       if i == 1
-        # node.vm.provision "file", source: "../tools/ubuntu/vimrc", destination: "$HOME/.vimrc"
         node.vm.provision "file", source: "../tools/ubuntu/cilium-values.yaml", destination: "$HOME/cilium-values.yaml"
       end
     end
@@ -132,7 +123,6 @@ Vagrant.configure("2") do |config|
         :libvirt__guest_ipv6 => "no"
       setup_dns(node)
       setup_ssh(node)
-      # install_sshpass(node)
     end
   end
 
