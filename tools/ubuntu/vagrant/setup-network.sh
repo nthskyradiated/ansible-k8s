@@ -42,5 +42,4 @@ sudo chmod 644 /etc/netplan/50-cloud-init.yaml
 
 # EOF
 
-# Apply the new network configuration
 netplan apply

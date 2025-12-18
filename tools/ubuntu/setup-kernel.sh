@@ -13,9 +13,6 @@ for module in "${MODULES[@]}"; do
     fi
 done
 
-# Restarting systemd-modules-load.service is unnecessary, so we avoid it
-
-# Set network tunables
 cat <<EOF > /etc/sysctl.d/10-kubernetes.conf
 net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
@@ -24,5 +21,4 @@ net.bridge.bridge-nf-call-iptables = 1
 net.ipv4.ip_forward = 1
 EOF
 
-# Apply sysctl settings
 sysctl --system

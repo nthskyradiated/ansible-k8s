@@ -1,6 +1,5 @@
 #!/usr/bin/env ruby
 
-# Get project root directory (one level up from script location)
 ROOT_DIR = File.expand_path('..', File.dirname(__FILE__))
 
 # Read constants from Vagrantfile

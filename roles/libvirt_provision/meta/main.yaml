@@ -1,6 +1,6 @@
 galaxy_info:
   author: Andy Pandaan
-  description: Provision VMs using libvirt and qemu via Ansible
+  description: Provision VMs using libvirt via Ansible
   license: MIT
   min_ansible_version: "2.9"
 
