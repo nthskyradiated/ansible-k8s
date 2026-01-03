@@ -1,7 +1,7 @@
 ---
 # VM access
-vm_username: "andy" 
-vm_password: "x"
+vm_username: "ansible" 
+vm_password: "ansible"
 
 # Cluster configuration
 control_planes: 1

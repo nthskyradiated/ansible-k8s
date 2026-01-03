@@ -95,6 +95,7 @@
   become: true
   ignore_errors: true
 
+  # Initialize Kubernetes cluster
 - name: Initialize Kubernetes cluster
   ansible.builtin.shell: >
     kubeadm init --pod-network-cidr={{ pod_cidr }} --service-cidr={{ service_cidr }}
@@ -122,64 +123,69 @@
   ansible.builtin.copy:
     content: "{{ kubeadm_result.stdout }}"
     dest: "/home/{{ ansible_user }}/kubeadm-init-output.txt"
-  when: inventory_hostname == 'controlplane01'
+  when:
+    - inventory_hostname == 'controlplane01'
+    - kubeadm_result is defined
+  become: true
 
 - name: Ensure .kube directory exists on controlplane01
   ansible.builtin.file:
-    path: /home/{{ ansible_user }}/.kube
+    path: "/home/{{ ansible_user }}/.kube"
     state: directory
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0755'
-  when: inventory_hostname == 'controlplane01'
   become: true
+  when: inventory_hostname == 'controlplane01'
 
-- name: Copy kubeconfig
+- name: Copy admin kubeconfig to user's .kube
   ansible.builtin.copy:
     src: /etc/kubernetes/admin.conf
-    dest: /home/{{ ansible_user }}/.kube/config
+    dest: "/home/{{ ansible_user }}/.kube/config"
     remote_src: true
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0600'
-  when: inventory_hostname == 'controlplane01'
   become: true
+  when: inventory_hostname == 'controlplane01'
   changed_when: false
 
-- name: Ensure .kube directory exists on Ansible host
+# Fetch kubeconfig to localhost
+- name: Fetch kubeconfig to localhost
+  ansible.builtin.fetch:
+    src: "/home/{{ ansible_user }}/.kube/config"
+    dest: "/tmp/k8s-config-{{ ansible_date_time.epoch }}"
+    flat: true
+  delegate_to: controlplane01
+  run_once: true
+  become: true
+  when: inventory_hostname == 'controlplane01'
+  register: fetched_kubeconfig
+
+- name: Ensure local .kube directory exists
   ansible.builtin.file:
-    path: "/home/{{ lookup('env','USER') }}/.kube"
+    path: "{{ lookup('ansible.builtin.env','HOME') }}/.kube"
     state: directory
-    owner: "{{ lookup('env','USER') }}"
-    group: "{{ lookup('env','USER') }}"
+    owner: "{{ lookup('ansible.builtin.env','USER') }}"
     mode: '0700'
   delegate_to: localhost
   run_once: true
   become: false
-  ignore_errors: true
 
-- name: Export kubeconfig to temporary location
-  ansible.builtin.fetch:
-    src: /home/{{ ansible_user }}/.kube/config
-    dest: "/tmp/k8s-config-{{ ansible_date_time.epoch }}"
-    flat: true
-  when: inventory_hostname == 'controlplane01'
-  become: true
-  register: temp_kubeconfig
-
-- name: Move kubeconfig to final location
-  ansible.builtin.command: "mv {{ temp_kubeconfig.dest }} /home/{{ lookup('env','USER') }}/.kube/config"
+- name: Move kubeconfig to final location on localhost
+  ansible.builtin.command:
+    cmd: mv "/tmp/k8s-config-{{ ansible_date_time.epoch }}" "{{ lookup('ansible.builtin.env','HOME') }}/.kube/config"
   delegate_to: localhost
-  when: inventory_hostname == 'controlplane01' and temp_kubeconfig is defined
-  # become: true
-  become_user: "{{ lookup('env','USER') }}"
+  run_once: true
+  become: false
+  when: fetched_kubeconfig is defined
 
-- name: Set correct ownership and permissions on kubeconfig
+- name: Set ownership/permissions on local kubeconfig
   ansible.builtin.file:
-    path: /home/{{ lookup('env','USER') }}/.kube/config
-    owner: "{{ lookup('env','USER') }}"
-    group: "{{ lookup('env','USER') }}"
+    path: "{{ lookup('ansible.builtin.env','HOME') }}/.kube/config"
+    owner: "{{ lookup('ansible.builtin.env','USER') }}"
     mode: '0600'
   delegate_to: localhost
-  when: inventory_hostname == 'controlplane01'
+  run_once: true
   become: false
+  when: fetched_kubeconfig is defined
