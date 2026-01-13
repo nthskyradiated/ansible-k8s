@@ -1,6 +1,6 @@
 ---
 # VM access
-vm_username: "ansible"
+vm_username: "ansible" 
 vm_password: "ansible"
 
 # Cluster configuration
